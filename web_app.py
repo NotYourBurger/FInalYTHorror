@@ -1604,23 +1604,54 @@ def serve_static(path):
 # Main function to run the app
 def main():
     try:
-        # Try to use ngrok for public URL
-        from pyngrok import ngrok
-        
-        # Set up ngrok
-        port = 5000
-        public_url = ngrok.connect(port).public_url
-        print(f" * Running on {public_url}")
-        print(f" * Local URL: http://127.0.0.1:{port}")
-        
-        # Run with waitress
-        waitress.serve(app, host='0.0.0.0', port=port)
-    except ImportError:
-        # Fall back to regular Flask server
-        print(" * ngrok not available, running on local URL only")
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        # Check if running in Google Colab
+        try:
+            import google.colab
+            IN_COLAB = True
+        except ImportError:
+            IN_COLAB = False
+            
+        if IN_COLAB:
+            # Use Colab's built-in tunneling
+            from google.colab.output import eval_js
+            print("\n🔄 Setting up Google Colab for external access...")
+            
+            # Use Colab's JavaScript to get the tunnel URL
+            colab_tunnel_js = """
+            (async ()=>{
+                const tunnel = await google.colab.kernel.proxyPort(5000, {'cache': true});
+                return tunnel;
+            })()
+            """
+            tunnel_url = eval_js(colab_tunnel_js)
+            
+            print(f"\n✅ PUBLIC URL: {tunnel_url}")
+            print(f"📱 You can access this URL from your phone or any device")
+            print(f"🖥️ Local URL: http://127.0.0.1:5000")
+            
+            # Run Flask app
+            print("\n⚙️ Starting web server...")
+            app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+            
+        else:
+            # Not in Colab, try to get local IP for LAN access
+            print("\n🔍 Finding your local IP address...")
+            
+            import socket
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            
+            print(f"\n📡 Your app will be available at:")
+            print(f"🖥️ Local URL: http://127.0.0.1:5000")
+            print(f"📱 LAN URL: http://{local_ip}:5000 (accessible from devices on your network)")
+            print("\n⚠️ Note: To access from your phone, both devices must be on the same network")
+            
+            # Run Flask with host='0.0.0.0' to make it accessible on the network
+            app.run(host='0.0.0.0', port=5000, debug=True)
+            
     except Exception as e:
-        print(f"Error starting server: {str(e)}")
+        print(f"\n❌ Error starting server: {str(e)}")
+        print("Try installing the required packages: pip install flask flask-cors")
         sys.exit(1)
 
 if __name__ == "__main__":
