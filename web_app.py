@@ -1616,22 +1616,17 @@ def main():
             from google.colab.output import eval_js
             print("\n🔄 Setting up Google Colab for external access...")
             
-            # Use Colab's JavaScript to get the tunnel URL
-            colab_tunnel_js = """
-            (async ()=>{
-                const tunnel = await google.colab.kernel.proxyPort(5000, {'cache': true});
-                return tunnel;
-            })()
-            """
-            tunnel_url = eval_js(colab_tunnel_js)
+            # Get the public URL where you can access the app
+            port = 5000
+            public_url = eval_js("google.colab.kernel.proxyPort(%d)" % port)
             
-            print(f"\n✅ PUBLIC URL: {tunnel_url}")
+            print(f"\n✅ PUBLIC URL: {public_url}")
             print(f"📱 You can access this URL from your phone or any device")
-            print(f"🖥️ Local URL: http://127.0.0.1:5000")
+            print(f"🖥️ Local URL: http://127.0.0.1:{port}")
             
             # Run Flask app
             print("\n⚙️ Starting web server...")
-            app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+            app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
             
         else:
             # Not in Colab, try to get local IP for LAN access
