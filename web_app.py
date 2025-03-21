@@ -6,19 +6,12 @@ import threading
 import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import waitress
 
 # Create Flask app with correct template folder
 app = Flask(__name__, 
             template_folder=os.path.abspath("web/templates"),
             static_folder=os.path.abspath("web/static"))
 CORS(app)  # Enable CORS for all routes
-
-# Dictionary to store active projects
-active_projects = {}
-
-# Dictionary to store background tasks
-background_tasks = {}
 
 # Ensure all required directories exist
 def ensure_directories():
@@ -42,7 +35,7 @@ def ensure_directories():
 # Call the function to ensure directories exist
 ensure_directories()
 
-# Create a simplified HTML template
+# HTML template - Simple one-click interface
 try:
     with open("web/templates/index.html", "w") as f:
         f.write("""<!DOCTYPE html>
@@ -297,44 +290,21 @@ except Exception as e:
     print(f"Error creating style.css: {str(e)}")
     sys.exit(1)
 
-# Create JavaScript file for one-click process
+# Create JavaScript file
 try:
     with open("web/static/js/app.js", "w") as f:
         f.write("""// Global variables
-let projectId = null;
 let isGenerating = false;
+let socket = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Set up event listeners
     document.getElementById('generate-btn').addEventListener('click', startGeneration);
     
-    // Create a new project on load
-    createProject();
-    
     // Add initial log entry
     addLogEntry('System ready. Click "Generate Horror Video" to begin.', 'info');
 });
-
-// Create a new project
-async function createProject() {
-    try {
-        const response = await fetch('/api/projects', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            projectId = data.project_id;
-            console.log('Project created with ID:', projectId);
-        } else {
-            addLogEntry('Failed to create project: ' + data.message, 'error');
-        }
-    } catch (error) {
-        addLogEntry('Error creating project: ' + error.message, 'error');
-    }
-}
 
 // Start the generation process
 async function startGeneration() {
@@ -356,268 +326,77 @@ async function startGeneration() {
     addLogEntry('Starting horror video generation process...', 'info');
     
     try {
-        // Step 1: Generate complete story (fetch, select, and enhance)
-        addLogEntry('Fetching and enhancing horror story...', 'info');
-        updateProgress(10);
-        
-        const storyResponse = await fetch(`/api/generate_story?project_id=${projectId}`, {
+        // Call the API to start the generation process
+        const response = await fetch('/api/generate', {
             method: 'POST'
         });
         
-        const storyData = await storyResponse.json();
-        
-        if (!storyData.success) {
-            throw new Error(storyData.message);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to start generation');
         }
         
-        addLogEntry(`Story selected: "${storyData.title}"`, 'success');
-        updateProgress(20);
-        
-        // Step 2: Generate narration
-        addLogEntry('Generating voice narration...', 'info');
-        updateProgress(30);
-        
-        const narrationResponse = await fetch(`/api/narration?project_id=${projectId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                voice: 'af_bella',
-                speed: 0.85
-            })
-        });
-        
-        const narrationData = await narrationResponse.json();
-        
-        if (!narrationData.success) {
-            throw new Error(narrationData.message);
-        }
-        
-        // Poll for narration status
-        await pollStatus('narration', 40);
-        
-        // Step 3: Generate subtitles
-        addLogEntry('Generating subtitles and scene descriptions...', 'info');
-        updateProgress(50);
-        
-        const subtitlesResponse = await fetch(`/api/subtitles?project_id=${projectId}`, {
-            method: 'POST'
-        });
-        
-        const subtitlesData = await subtitlesResponse.json();
-        
-        if (!subtitlesData.success) {
-            throw new Error(subtitlesData.message);
-        }
-        
-        // Poll for subtitles status
-        await pollStatus('subtitles', 60);
-        
-        // Step 4: Generate images
-        addLogEntry('Generating cinematic horror images...', 'info');
-        updateProgress(70);
-        
-        const imagesResponse = await fetch(`/api/images?project_id=${projectId}`, {
-            method: 'POST'
-        });
-        
-        const imagesData = await imagesResponse.json();
-        
-        if (!imagesData.success) {
-            throw new Error(imagesData.message);
-        }
-        
-        // Poll for images status and display them
-        const imageUrls = await pollImagesStatus(80);
-        displayImages(imageUrls);
-        
-        // Step 5: Compile video
-        addLogEntry('Compiling final horror video...', 'info');
-        updateProgress(90);
-        
-        const videoResponse = await fetch(`/api/video?project_id=${projectId}`, {
-            method: 'POST'
-        });
-        
-        const videoData = await videoResponse.json();
-        
-        if (!videoData.success) {
-            throw new Error(videoData.message);
-        }
-        
-        // Poll for video status and display it
-        const videoUrl = await pollVideoStatus(95);
-        displayVideo(videoUrl);
-        
-        // Complete
-        addLogEntry('Horror video generation complete!', 'success');
-        updateProgress(100);
+        // Start polling for updates
+        startPolling();
         
     } catch (error) {
-        addLogEntry('Error generating video: ' + error.message, 'error');
-        updateProgress(0);
-    } finally {
+        addLogEntry('Error: ' + error.message, 'error');
         generateBtn.disabled = false;
         generateBtn.textContent = 'Generate Horror Video';
         isGenerating = false;
     }
 }
 
-// Poll for status of a task
-async function pollStatus(task, progressStart) {
-    return new Promise((resolve, reject) => {
-        const maxAttempts = 60; // 5 minutes max (5s intervals)
-        let attempts = 0;
-        
-        const checkStatus = async () => {
-            try {
-                const response = await fetch(`/api/${task}/status?project_id=${projectId}`);
-                const data = await response.json();
-                
-                if (!data.success) {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
-                
-                // Update progress
-                const taskProgress = data.progress || 0;
-                updateProgress(progressStart + (taskProgress * 0.1)); // 10% of the total progress
-                
-                // Update log
-                if (data.message) {
-                    addLogEntry(data.message, 'info', false);
-                }
-                
-                if (data.status === 'completed') {
-                    clearInterval(interval);
-                    resolve(data);
-                    return;
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
-                
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    reject(new Error(`${task} process timed out`));
-                }
-            } catch (error) {
-                clearInterval(interval);
-                reject(error);
+// Poll for updates
+function startPolling() {
+    const pollInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            
+            // Update progress
+            updateProgress(data.progress);
+            
+            // Update log if there's a new message
+            if (data.message) {
+                addLogEntry(data.message, data.level || 'info');
             }
-        };
-        
-        const interval = setInterval(checkStatus, 5000);
-        checkStatus(); // Check immediately
-    });
-}
-
-// Poll for images status and return image URLs
-async function pollImagesStatus(progressStart) {
-    return new Promise((resolve, reject) => {
-        const maxAttempts = 60;
-        let attempts = 0;
-        
-        const checkStatus = async () => {
-            try {
-                const response = await fetch(`/api/images/status?project_id=${projectId}`);
-                const data = await response.json();
-                
-                if (!data.success) {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
-                
-                // Update progress
-                const taskProgress = data.progress || 0;
-                updateProgress(progressStart + (taskProgress * 0.1));
-                
-                // Update log
-                if (data.message) {
-                    addLogEntry(data.message, 'info', false);
-                }
-                
-                if (data.status === 'completed') {
-                    clearInterval(interval);
-                    resolve(data.image_urls);
-                    return;
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
-                
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    reject(new Error('Image generation timed out'));
-                }
-            } catch (error) {
-                clearInterval(interval);
-                reject(error);
+            
+            // Update images if available
+            if (data.images && data.images.length > 0) {
+                displayImages(data.images);
             }
-        };
-        
-        const interval = setInterval(checkStatus, 5000);
-        checkStatus(); // Check immediately
-    });
-}
-
-// Poll for video status and return video URL
-async function pollVideoStatus(progressStart) {
-    return new Promise((resolve, reject) => {
-        const maxAttempts = 60;
-        let attempts = 0;
-        
-        const checkStatus = async () => {
-            try {
-                const response = await fetch(`/api/video/status?project_id=${projectId}`);
-                const data = await response.json();
+            
+            // Update video if available
+            if (data.video) {
+                displayVideo(data.video);
                 
-                if (!data.success) {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
+                // Complete
+                addLogEntry('Horror video generation complete!', 'success');
+                updateProgress(100);
                 
-                // Update progress
-                const taskProgress = data.progress || 0;
-                updateProgress(progressStart + (taskProgress * 0.05));
+                // Stop polling
+                clearInterval(pollInterval);
                 
-                // Update log
-                if (data.message) {
-                    addLogEntry(data.message, 'info', false);
-                }
-                
-                if (data.status === 'completed') {
-                    clearInterval(interval);
-                    resolve(data.video_url);
-                    return;
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    reject(new Error(data.message));
-                    return;
-                }
-                
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    reject(new Error('Video compilation timed out'));
-                }
-            } catch (error) {
-                clearInterval(interval);
-                reject(error);
+                // Reset button
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').textContent = 'Generate Horror Video';
+                isGenerating = false;
             }
-        };
-        
-        const interval = setInterval(checkStatus, 5000);
-        checkStatus(); // Check immediately
-    });
+            
+            // Check for completion or error
+            if (data.status === 'error') {
+                addLogEntry('Error: ' + data.message, 'error');
+                clearInterval(pollInterval);
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').textContent = 'Generate Horror Video';
+                isGenerating = false;
+            }
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+        }
+    }, 2000);
 }
 
 // Display images in the grid
@@ -639,9 +418,6 @@ function displayImages(imageUrls) {
     });
     
     document.getElementById('image-preview').style.display = 'block';
-    
-    // Scroll to images
-    document.getElementById('image-preview').scrollIntoView({ behavior: 'smooth' });
 }
 
 // Display the final video
@@ -654,13 +430,10 @@ function displayVideo(videoUrl) {
     downloadLink.download = 'horror_video.mp4';
     
     document.getElementById('video-container').style.display = 'block';
-    
-    // Scroll to video
-    document.getElementById('video-container').scrollIntoView({ behavior: 'smooth' });
 }
 
 // Add a log entry to the terminal
-function addLogEntry(message, type = 'info', newLine = true) {
+function addLogEntry(message, type = 'info') {
     const terminal = document.getElementById('terminal-content');
     
     const entry = document.createElement('div');
@@ -669,12 +442,7 @@ function addLogEntry(message, type = 'info', newLine = true) {
     const timestamp = new Date().toLocaleTimeString();
     entry.textContent = `[${timestamp}] ${message}`;
     
-    if (newLine || terminal.children.length === 0) {
-        terminal.appendChild(entry);
-    } else {
-        // Replace the last entry
-        terminal.replaceChild(entry, terminal.lastChild);
-    }
+    terminal.appendChild(entry);
     
     // Scroll to bottom
     terminal.scrollTop = terminal.scrollHeight;
@@ -696,56 +464,31 @@ except Exception as e:
     print(f"Error creating app.js: {str(e)}")
     sys.exit(1)
 
-# Mock services for demonstration
-# In a real application, you would import these from your actual modules
-class MockRedditService:
-    def get_subreddit_list(self):
-        return ["nosleep", "shortscarystories", "creepypasta", "letsnotmeet", "libraryofshadows"]
-    
-    def fetch_stories(self, subreddits, min_length):
-        # Mock implementation
-        return []
-    
-    def mark_story_used(self, story_id):
-        pass
+# Import the prototype.py functions
+try:
+    from prototype import fetch_and_enhance_nosleep_story, generate_voice_narration, generate_subtitles_from_audio
+    from prototype import generate_scene_descriptions, generate_image_prompts, generate_images_from_prompts
+    from prototype import compile_video, run_complete_pipeline
+    print("✓ Successfully imported functions from prototype.py")
+except ImportError as e:
+    print(f"Error importing from prototype.py: {str(e)}")
+    print("Make sure prototype.py is in the same directory as web_app.py")
+    sys.exit(1)
 
-class MockAIService:
-    def enhance_story(self, content):
-        return content
-    
-    def generate_scene_descriptions(self, subtitle_segments):
-        return []
-    
-    def generate_image_prompts(self, scene_descriptions, style):
-        return []
+# Global variables to track generation status
+generation_status = {
+    'status': 'idle',
+    'progress': 0,
+    'message': '',
+    'level': 'info',
+    'images': [],
+    'video': None
+}
 
-class MockAudioService:
-    def generate_narration(self, text, voice, speed):
-        return "output/audio/narration.mp3"
-    
-    def generate_subtitles(self, audio_path):
-        return "output/subtitles/subtitles.srt"
-    
-    def parse_srt_timestamps(self, srt_path):
-        return []
+# Background thread for generation
+generation_thread = None
 
-class MockImageService:
-    def generate_story_images(self, prompts):
-        return ["output/images/image1.jpg", "output/images/image2.jpg"]
-
-class MockVideoService:
-    def create_video(self, prompts, image_paths, audio_path, title, srt_path, video_quality, use_dust_overlay):
-        return "output/videos/video.mp4"
-
-# Initialize mock services
-# In a real application, replace these with your actual service instances
-reddit_service = MockRedditService()
-ai_service = MockAIService()
-audio_service = MockAudioService()
-image_service = MockImageService()
-video_service = MockVideoService()
-
-# API routes
+# Routes
 @app.route('/')
 def index():
     try:
@@ -754,615 +497,35 @@ def index():
         print(f"Error serving index.html: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/projects', methods=['POST'])
-def create_project():
-    try:
-        project_id = str(uuid.uuid4())
-        active_projects[project_id] = {
-            'story_data': None,
-            'audio_path': None,
-            'subtitles_path': None,
-            'scene_descriptions': None,
-            'image_prompts': None,
-            'image_paths': None,
-            'video_path': None,
-            'stories': []
-        }
-        return jsonify({'success': True, 'project_id': project_id})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/subreddits')
-def get_subreddits():
-    subreddits = reddit_service.get_subreddit_list()
-    return jsonify({'success': True, 'subreddits': subreddits})
-
-@app.route('/api/stories', methods=['POST'])
-def fetch_stories():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
+@app.route('/api/generate', methods=['POST'])
+def generate():
+    global generation_thread, generation_status
     
-    data = request.json
-    subreddits = data.get('subreddits', [])
-    min_length = int(data.get('min_length', 1000))
+    # Check if already generating
+    if generation_status['status'] == 'running':
+        return jsonify({'success': False, 'message': 'Generation already in progress'}), 400
     
-    try:
-        stories = reddit_service.fetch_stories(subreddits=subreddits, min_length=min_length)
-        
-        # Convert to serializable format
-        story_data = []
-        for story in stories:
-            story_data.append({
-                'id': story.id,
-                'title': story.title,
-                'author': story.author.name,
-                'subreddit': story.subreddit.display_name,
-                'content': story.selftext,
-                'url': story.url
-            })
-        
-        active_projects[project_id]['stories'] = story_data
-        
-        return jsonify({
-            'success': True, 
-            'stories': story_data
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/enhance', methods=['POST'])
-def enhance_story():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    data = request.json
-    story_index = int(data.get('story_index', 0))
-    
-    try:
-        stories = active_projects[project_id]['stories']
-        if story_index < 0 or story_index >= len(stories):
-            return jsonify({'success': False, 'message': 'Invalid story index'})
-        
-        story = stories[story_index]
-        
-        # Enhance the story
-        enhanced_story = ai_service.enhance_story(story['content'])
-        
-        # Update project data
-        active_projects[project_id]['story_data'] = {
-            'title': story['title'],
-            'original': story['content'],
-            'enhanced': enhanced_story,
-            'subreddit': story['subreddit'],
-            'story_id': story['id']
-        }
-        
-        # Mark story as used
-        reddit_service.mark_story_used(story['id'])
-        
-        return jsonify({'success': True, 'enhanced_story': enhanced_story})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-def narration_worker(project_id, voice, speed):
-    try:
-        project = active_projects[project_id]
-        if not project['story_data']:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'No story data available'
-            return
-        
-        # Generate narration
-        background_tasks[project_id]['status'] = 'processing'
-        background_tasks[project_id]['progress'] = 10
-        background_tasks[project_id]['message'] = 'Generating narration...'
-        
-        audio_path = audio_service.generate_narration(
-            project['story_data']['enhanced'],
-            voice=voice,
-            speed=speed
-        )
-        
-        if audio_path:
-            project['audio_path'] = audio_path
-            background_tasks[project_id]['status'] = 'completed'
-            background_tasks[project_id]['progress'] = 100
-            background_tasks[project_id]['message'] = 'Narration generated successfully'
-        else:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'Failed to generate narration'
-    except Exception as e:
-        background_tasks[project_id]['status'] = 'error'
-        background_tasks[project_id]['message'] = str(e)
-
-@app.route('/api/narration', methods=['POST'])
-def generate_narration():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    data = request.json
-    voice = data.get('voice', 'af_bella')
-    speed = float(data.get('speed', 0.85))
-    
-    # Start background task
-    background_tasks[project_id] = {
-        'task': 'narration',
-        'status': 'starting',
+    # Reset status
+    generation_status = {
+        'status': 'running',
         'progress': 0,
-        'message': 'Starting narration generation...'
+        'message': 'Starting generation process...',
+        'level': 'info',
+        'images': [],
+        'video': None
     }
     
-    thread = threading.Thread(
-        target=narration_worker,
-        args=(project_id, voice, speed)
-    )
-    thread.daemon = True
-    thread.start()
+    # Start generation in background thread
+    generation_thread = threading.Thread(target=run_generation)
+    generation_thread.daemon = True
+    generation_thread.start()
     
-    return jsonify({
-        'success': True, 
-        'message': 'Narration generation started',
-        'task_id': project_id
-    })
+    return jsonify({'success': True, 'message': 'Generation started'})
 
-@app.route('/api/narration/status')
-def narration_status():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in background_tasks:
-        return jsonify({'success': False, 'message': 'Invalid task ID'})
-    
-    task = background_tasks[project_id]
-    
-    if task['status'] == 'completed':
-        # Get audio URL
-        audio_path = active_projects[project_id]['audio_path']
-        audio_url = f'/output/audio/{os.path.basename(audio_path)}'
-        
-        return jsonify({
-            'success': True,
-            'status': task['status'],
-            'progress': task['progress'],
-            'message': task['message'],
-            'audio_url': audio_url
-        })
-    
-    return jsonify({
-        'success': True,
-        'status': task['status'],
-        'progress': task['progress'],
-        'message': task['message']
-    })
+@app.route('/api/status')
+def status():
+    return jsonify(generation_status)
 
-def subtitles_worker(project_id):
-    try:
-        project = active_projects[project_id]
-        if not project['audio_path']:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'No audio file available'
-            return
-        
-        # Generate subtitles
-        background_tasks[project_id]['status'] = 'processing'
-        background_tasks[project_id]['progress'] = 10
-        background_tasks[project_id]['message'] = 'Generating subtitles...'
-        
-        srt_path = audio_service.generate_subtitles(project['audio_path'])
-        
-        if srt_path:
-            project['subtitles_path'] = srt_path
-            
-            # Parse subtitles for scene descriptions
-            background_tasks[project_id]['progress'] = 50
-            background_tasks[project_id]['message'] = 'Parsing subtitles...'
-            
-            subtitle_segments = audio_service.parse_srt_timestamps(srt_path)
-            
-            # Generate scene descriptions
-            background_tasks[project_id]['progress'] = 70
-            background_tasks[project_id]['message'] = 'Generating scene descriptions...'
-            
-            scene_descriptions = ai_service.generate_scene_descriptions(subtitle_segments)
-            project['scene_descriptions'] = scene_descriptions
-            
-            background_tasks[project_id]['status'] = 'completed'
-            background_tasks[project_id]['progress'] = 100
-            background_tasks[project_id]['message'] = 'Subtitles and scene descriptions generated'
-        else:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'Failed to generate subtitles'
-    except Exception as e:
-        background_tasks[project_id]['status'] = 'error'
-        background_tasks[project_id]['message'] = str(e)
-
-@app.route('/api/subtitles', methods=['POST'])
-def generate_subtitles():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    # Start background task
-    background_tasks[project_id] = {
-        'task': 'subtitles',
-        'status': 'starting',
-        'progress': 0,
-        'message': 'Starting subtitle generation...'
-    }
-    
-    thread = threading.Thread(
-        target=subtitles_worker,
-        args=(project_id,)
-    )
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({
-        'success': True, 
-        'message': 'Subtitle generation started',
-        'task_id': project_id
-    })
-
-@app.route('/api/subtitles/status')
-def subtitles_status():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in background_tasks:
-        return jsonify({'success': False, 'message': 'Invalid task ID'})
-    
-    task = background_tasks[project_id]
-    
-    return jsonify({
-        'success': True,
-        'status': task['status'],
-        'progress': task['progress'],
-        'message': task['message']
-    })
-
-def images_worker(project_id, style):
-    try:
-        project = active_projects[project_id]
-        if not project['scene_descriptions']:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'No scene descriptions available'
-            return
-        
-        # Generate image prompts
-        background_tasks[project_id]['status'] = 'processing'
-        background_tasks[project_id]['progress'] = 10
-        background_tasks[project_id]['message'] = 'Generating image prompts...'
-        
-        image_prompts = ai_service.generate_image_prompts(
-            project['scene_descriptions'], 
-            style=style.lower()
-        )
-        project['image_prompts'] = image_prompts
-        
-        # Generate images
-        background_tasks[project_id]['progress'] = 30
-        background_tasks[project_id]['message'] = 'Generating images...'
-        
-        image_paths = image_service.generate_story_images(image_prompts)
-        
-        if image_paths:
-            project['image_paths'] = image_paths
-            background_tasks[project_id]['status'] = 'completed'
-            background_tasks[project_id]['progress'] = 100
-            background_tasks[project_id]['message'] = 'Images generated successfully'
-        else:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'Failed to generate images'
-    except Exception as e:
-        background_tasks[project_id]['status'] = 'error'
-        background_tasks[project_id]['message'] = str(e)
-
-@app.route('/api/images', methods=['POST'])
-def generate_images():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    data = request.json
-    style = data.get('style', 'Cinematic')
-    
-    # Start background task
-    background_tasks[project_id] = {
-        'task': 'images',
-        'status': 'starting',
-        'progress': 0,
-        'message': 'Starting image generation...'
-    }
-    
-    thread = threading.Thread(
-        target=images_worker,
-        args=(project_id, style)
-    )
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({
-        'success': True, 
-        'message': 'Image generation started',
-        'task_id': project_id
-    })
-
-@app.route('/api/images/status')
-def images_status():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in background_tasks:
-        return jsonify({'success': False, 'message': 'Invalid task ID'})
-    
-    task = background_tasks[project_id]
-    
-    if task['status'] == 'completed':
-        # Get image URLs
-        image_paths = active_projects[project_id]['image_paths']
-        image_urls = [f'/output/images/{os.path.basename(path)}' for path in image_paths]
-        
-        return jsonify({
-            'success': True,
-            'status': task['status'],
-            'progress': task['progress'],
-            'message': task['message'],
-            'image_urls': image_urls
-        })
-    
-    return jsonify({
-        'success': True,
-        'status': task['status'],
-        'progress': task['progress'],
-        'message': task['message']
-    })
-
-def video_worker(project_id, quality, use_dust_overlay):
-    try:
-        project = active_projects[project_id]
-        if not project['image_paths'] or not project['audio_path']:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'Missing required files'
-            return
-        
-        # Compile video
-        background_tasks[project_id]['status'] = 'processing'
-        background_tasks[project_id]['progress'] = 10
-        background_tasks[project_id]['message'] = 'Compiling video...'
-        
-        video_path = video_service.create_video(
-            project['image_prompts'],
-            project['image_paths'],
-            project['audio_path'],
-            project['story_data']['title'],
-            srt_path=project['subtitles_path'],
-            video_quality=quality,
-            use_dust_overlay=use_dust_overlay
-        )
-        
-        if video_path:
-            project['video_path'] = video_path
-            background_tasks[project_id]['status'] = 'completed'
-            background_tasks[project_id]['progress'] = 100
-            background_tasks[project_id]['message'] = 'Video compiled successfully'
-        else:
-            background_tasks[project_id]['status'] = 'error'
-            background_tasks[project_id]['message'] = 'Failed to compile video'
-    except Exception as e:
-        background_tasks[project_id]['status'] = 'error'
-        background_tasks[project_id]['message'] = str(e)
-
-@app.route('/api/video', methods=['POST'])
-def compile_video():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    data = request.json
-    quality = data.get('quality', '4000k')
-    use_dust_overlay = data.get('use_dust_overlay', True)
-    
-    # Start background task
-    background_tasks[project_id] = {
-        'task': 'video',
-        'status': 'starting',
-        'progress': 0,
-        'message': 'Starting video compilation...'
-    }
-    
-    thread = threading.Thread(
-        target=video_worker,
-        args=(project_id, quality, use_dust_overlay)
-    )
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({
-        'success': True, 
-        'message': 'Video compilation started',
-        'task_id': project_id
-    })
-
-@app.route('/api/video/status')
-def video_status():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in background_tasks:
-        return jsonify({'success': False, 'message': 'Invalid task ID'})
-    
-    task = background_tasks[project_id]
-    
-    if task['status'] == 'completed':
-        # Get video URL
-        video_path = active_projects[project_id]['video_path']
-        video_url = f'/output/videos/{os.path.basename(video_path)}'
-        
-        return jsonify({
-            'success': True,
-            'status': task['status'],
-            'progress': task['progress'],
-            'message': task['message'],
-            'video_url': video_url
-        })
-    
-    return jsonify({
-        'success': True,
-        'status': task['status'],
-        'progress': task['progress'],
-        'message': task['message']
-    })
-
-@app.route('/api/generate_story', methods=['POST'])
-def generate_story():
-    project_id = request.args.get('project_id')
-    if not project_id or project_id not in active_projects:
-        return jsonify({'success': False, 'message': 'Invalid project ID'})
-    
-    try:
-        # Import necessary modules from prototype.py
-        import praw
-        from google import genai
-        import random
-        import os
-        
-        # Initialize Reddit client
-        reddit = praw.Reddit(
-            client_id="Jf3jkA3Y0dBCfluYvS8aVw",
-            client_secret="1dWKIP6ME7FBR66motXS6273rkkf0g",
-            user_agent="Horror Stories by Wear_Severe"
-        )
-        
-        # Initialize Gemini API
-        client = genai.Client(api_key="AIzaSyD_vBSluRNPI6z7JoKfl67M6D3DCq4l0NI")
-        
-        # Horror subreddits
-        horror_subreddits = [
-            "nosleep", 
-            "shortscarystories", 
-            "creepypasta", 
-            "LetsNotMeet",
-            "DarkTales",
-            "TheCrypticCompendium",
-            "libraryofshadows",
-            "scarystories"
-        ]
-        
-        # Randomly select 2-3 subreddits to fetch from
-        selected_subreddits = random.sample(horror_subreddits, min(3, len(horror_subreddits)))
-        
-        # Fetch stories from selected subreddits
-        all_posts = []
-        for subreddit_name in selected_subreddits:
-            try:
-                subreddit = reddit.subreddit(subreddit_name)
-                posts = list(subreddit.top("week", limit=30))
-                all_posts.extend(posts)
-                addLogEntry(project_id, f"Fetched {len(posts)} stories from r/{subreddit_name}", "info")
-            except Exception as e:
-                addLogEntry(project_id, f"Error fetching from r/{subreddit_name}: {str(e)}", "error")
-        
-        # Shuffle posts to randomize selection
-        random.shuffle(all_posts)
-        
-        # Filter out very short posts and previously used posts
-        cache_file = "used_story_ids.txt"
-        used_ids = set()
-        
-        if os.path.exists(cache_file):
-            with open(cache_file, 'r') as f:
-                used_ids = set(line.strip() for line in f.readlines())
-        
-        # Use a fixed minimum length
-        min_length = 1000
-        filtered_posts = [
-            post for post in all_posts 
-            if post.id not in used_ids 
-            and len(post.selftext) > min_length
-        ]
-        
-        if not filtered_posts:
-            filtered_posts = [post for post in all_posts if len(post.selftext) > min_length]
-        
-        if not filtered_posts:
-            return jsonify({'success': False, 'message': 'No suitable stories found'})
-        
-        # Take a subset of posts for selection
-        selection_posts = filtered_posts[:min(20, len(filtered_posts))]
-        
-        # Create a prompt for story selection
-        post_titles = "\n".join([f"{i+1}. {post.title}" for i, post in enumerate(selection_posts)])
-        
-        selection_prompt = f"""Select ONE story number (1-{len(selection_posts)}) that has the strongest potential for a horror podcast narrative. Consider:
-- Clear narrative structure
-- Strong character development
-- Unique premise
-- Visual storytelling potential
-- Atmospheric content
-
-Available stories:
-{post_titles}
-
-Return only the number."""
-        
-        # Get story selection
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=selection_prompt
-        ).text
-        
-        try:
-            story_index = int(response.strip()) - 1
-            chosen_story = selection_posts[story_index]
-            
-            # Save story ID to avoid reuse
-            with open(cache_file, 'a') as f:
-                f.write(f"{chosen_story.id}\n")
-                
-        except (ValueError, IndexError) as e:
-            chosen_story = random.choice(selection_posts)
-        
-        # Create enhanced podcast-style prompt
-        enhancement_prompt = """Transform this story into a voice over script with the following structure:
-
-1. Start with a powerful hook about the story's theme (2-3 sentences)
-2. Include this intro: "Welcome to The Withering Club, where we explore the darkest corners of human experience. I'm your host, Anna. Before we begin tonight's story, remember that the shadows you see might be watching back. Now, dim the lights and prepare yourself for tonight's tale..."
-3. Tell the story with a clear beginning, middle, and end, focusing on:
-   - Clear narrative flow
-   - Building tension
-   - Natural dialogue
-   - Atmospheric descriptions
-4. End with: "That concludes tonight's tale from The Withering Club. If this story kept you up at night, remember to like, share, and subscribe to join our growing community of darkness seekers. Until next time, remember... the best stories are the ones that follow you home. Sleep well, if you can."
-
-Original Story: {content}
-
-Return ONLY the complete script text with no additional formatting, explanations, or markdown."""
-        
-        # Get enhanced story
-        enhanced_story = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=enhancement_prompt.format(content=chosen_story.selftext)
-        ).text
-        
-        # Clean up the enhanced story
-        enhanced_story = enhanced_story.strip()
-        
-        # Create story data
-        story_data = {
-            'title': chosen_story.title,
-            'original': chosen_story.selftext,
-            'enhanced': enhanced_story,
-            'subreddit': chosen_story.subreddit.display_name,
-            'story_id': chosen_story.id
-        }
-        
-        # Store the story data in the project
-        active_projects[project_id]['story_data'] = story_data
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Story generated successfully',
-            'title': story_data['title']
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-# Serve output files
 @app.route('/output/<path:filename>')
 def serve_output(filename):
     try:
@@ -1370,13 +533,62 @@ def serve_output(filename):
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
-# Serve static files
 @app.route('/static/<path:path>')
 def serve_static(path):
     try:
         return send_from_directory('web/static', path)
     except Exception as e:
         return jsonify({'error': str(e)}), 404
+
+# Function to run the generation process
+def run_generation():
+    global generation_status
+    
+    try:
+        # Update status
+        generation_status['message'] = 'Running complete horror video generation pipeline...'
+        
+        # Define a callback function to update progress
+        def progress_callback(message, progress, level='info'):
+            generation_status['message'] = message
+            generation_status['progress'] = progress
+            generation_status['level'] = level
+            
+            # If we have image paths, update the images list
+            if 'image_paths' in generation_status and generation_status['image_paths']:
+                image_urls = [f'/output/images/{os.path.basename(img)}' for img in generation_status['image_paths']]
+                generation_status['images'] = image_urls
+        
+        # Run the complete pipeline from prototype.py
+        results = run_complete_pipeline(progress_callback=progress_callback)
+        
+        if results:
+            # Update status with results
+            generation_status['status'] = 'completed'
+            generation_status['progress'] = 100
+            generation_status['message'] = 'Horror video generation complete!'
+            generation_status['level'] = 'success'
+            
+            # Set image paths
+            if 'image_paths' in results and results['image_paths']:
+                image_urls = [f'/output/images/{os.path.basename(img)}' for img in results['image_paths']]
+                generation_status['images'] = image_urls
+            
+            # Set video path
+            if 'video_path' in results and results['video_path']:
+                generation_status['video'] = f'/output/videos/{os.path.basename(results["video_path"])}'
+        else:
+            # Update status with error
+            generation_status['status'] = 'error'
+            generation_status['message'] = 'Failed to generate horror video'
+            generation_status['level'] = 'error'
+    
+    except Exception as e:
+        # Update status with error
+        generation_status['status'] = 'error'
+        generation_status['message'] = f'Error: {str(e)}'
+        generation_status['level'] = 'error'
+        print(f"Error in generation thread: {str(e)}")
 
 # Main function to run the app
 def main():
@@ -1391,7 +603,7 @@ def main():
         if IN_COLAB:
             print("\n🔄 Setting up Google Colab for external access...")
             
-            # Install flask-ngrok if not already installed
+            # Install pyngrok if not already installed
             import subprocess
             subprocess.run(["pip", "install", "pyngrok"], check=True)
             
@@ -1434,7 +646,7 @@ def main():
             
     except Exception as e:
         print(f"\n❌ Error starting server: {str(e)}")
-        print("Try installing the required packages: pip install flask flask-cors flask-ngrok")
+        print("Try installing the required packages: pip install flask flask-cors pyngrok")
         sys.exit(1)
 
 if __name__ == "__main__":
