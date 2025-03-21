@@ -1612,21 +1612,19 @@ def main():
             IN_COLAB = False
             
         if IN_COLAB:
-            # Use Colab's built-in tunneling
-            from google.colab.output import eval_js
             print("\n🔄 Setting up Google Colab for external access...")
             
-            # Get the public URL where you can access the app
-            port = 5000
-            public_url = eval_js("google.colab.kernel.proxyPort(%d)" % port)
+            # Install flask-ngrok if not already installed
+            import subprocess
+            subprocess.run(["pip", "install", "flask-ngrok"], check=True)
             
-            print(f"\n✅ PUBLIC URL: {public_url}")
-            print(f"📱 You can access this URL from your phone or any device")
-            print(f"🖥️ Local URL: http://127.0.0.1:{port}")
+            # Import and configure ngrok
+            from flask_ngrok import run_with_ngrok
+            run_with_ngrok(app)  # Start ngrok when app is run
             
-            # Run Flask app
-            print("\n⚙️ Starting web server...")
-            app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+            print("\n⚙️ Starting web server with ngrok tunneling...")
+            # When using run_with_ngrok, the ngrok URL will be printed automatically
+            app.run()
             
         else:
             # Not in Colab, try to get local IP for LAN access
@@ -1646,7 +1644,7 @@ def main():
             
     except Exception as e:
         print(f"\n❌ Error starting server: {str(e)}")
-        print("Try installing the required packages: pip install flask flask-cors")
+        print("Try installing the required packages: pip install flask flask-cors flask-ngrok")
         sys.exit(1)
 
 if __name__ == "__main__":
