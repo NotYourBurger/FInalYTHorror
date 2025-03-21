@@ -4,6 +4,8 @@ import os
 
 # Create the directory structure if it doesn't exist
 os.makedirs("web/templates", exist_ok=True)
+os.makedirs("web/static/js", exist_ok=True)
+os.makedirs("web/static/css", exist_ok=True)
 
 # HTML template
 with open("web/templates/index.html", "w") as f:
