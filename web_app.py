@@ -1607,6 +1607,7 @@ def main():
         # Check if running in Google Colab
         try:
             import google.colab
+            from google.colab import output
             IN_COLAB = True
         except ImportError:
             IN_COLAB = False
@@ -1614,17 +1615,37 @@ def main():
         if IN_COLAB:
             print("\n🔄 Setting up Google Colab for external access...")
             
-            # Install flask-ngrok if not already installed
-            import subprocess
-            subprocess.run(["pip", "install", "flask-ngrok"], check=True)
+            # Define port
+            port = 5000
             
-            # Import and configure ngrok
-            from flask_ngrok import run_with_ngrok
-            run_with_ngrok(app)  # Start ngrok when app is run
+            # Start Flask app in a separate thread so it doesn't block
+            import threading
+            def run_flask():
+                app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
             
-            print("\n⚙️ Starting web server with ngrok tunneling...")
-            # When using run_with_ngrok, the ngrok URL will be printed automatically
-            app.run()
+            flask_thread = threading.Thread(target=run_flask)
+            flask_thread.daemon = True
+            flask_thread.start()
+            
+            # Give Flask a moment to start
+            import time
+            time.sleep(3)
+            
+            # Expose the port using Colab's built-in method
+            print("\n🌐 Opening web app in a new browser window...")
+            output.serve_kernel_port_as_window(port)
+            
+            print(f"\n✅ Web app is now running")
+            print(f"📱 You can access the app through the opened browser window")
+            print(f"🖥️ Local URL: http://127.0.0.1:{port}")
+            print("\n⚠️ Keep this notebook running to keep the web app accessible")
+            
+            # Keep the main thread alive
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\nShutting down...")
             
         else:
             # Not in Colab, try to get local IP for LAN access
@@ -1644,7 +1665,7 @@ def main():
             
     except Exception as e:
         print(f"\n❌ Error starting server: {str(e)}")
-        print("Try installing the required packages: pip install flask flask-cors flask-ngrok")
+        print("Try installing the required packages: pip install flask flask-cors")
         sys.exit(1)
 
 if __name__ == "__main__":
