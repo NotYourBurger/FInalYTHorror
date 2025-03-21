@@ -6,7 +6,6 @@ from PyQt5.QtCore import Qt, pyqtSignal, QThread, QSize
 from PyQt5.QtGui import QFont, QPixmap, QImage
 import os
 from PIL import Image
-from PIL.ImageQt import ImageQt
 import io
 
 class ImageGenerationWorker(QThread):
@@ -77,11 +76,12 @@ class ImageGenerationScreen(QWidget):
         
         # Style selection
         style_layout = QHBoxLayout()
-        style_label = QLabel("Image Style:")
+        style_label = QLabel("Visual Style:")
         self.style_combo = QComboBox()
         self.style_combo.addItems(["Cinematic", "Realistic", "Artistic"])
         style_layout.addWidget(style_label)
         style_layout.addWidget(self.style_combo)
+        style_layout.addStretch()
         main_layout.addLayout(style_layout)
         
         # Generate button
@@ -95,23 +95,26 @@ class ImageGenerationScreen(QWidget):
         main_layout.addWidget(self.progress_bar)
         
         # Status label
-        self.status_label = QLabel("")
+        self.status_label = QLabel("Ready to generate images")
         main_layout.addWidget(self.status_label)
         
-        # Image preview grid
-        preview_group = QGroupBox("Image Previews")
+        # Image preview area
+        preview_group = QGroupBox("Generated Images")
         preview_layout = QVBoxLayout()
         
-        # Scroll area for images
+        # Create a scroll area for the images
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
+        
+        # Create a widget to hold the grid layout
         scroll_content = QWidget()
         self.image_grid = QGridLayout(scroll_content)
+        
         scroll_area.setWidget(scroll_content)
         preview_layout.addWidget(scroll_area)
         
         preview_group.setLayout(preview_layout)
-        main_layout.addWidget(preview_group, 1)  # Give it stretch factor
+        main_layout.addWidget(preview_group, 1)  # Give it a stretch factor
         
         # Navigation buttons
         nav_layout = QHBoxLayout()
@@ -145,23 +148,25 @@ class ImageGenerationScreen(QWidget):
             QMessageBox.warning(self, "Warning", "No scene descriptions available. Please go back and generate subtitles first.")
     
     def on_generate_clicked(self):
-        """Handle generate images button click"""
-        if not self.parent or not self.parent.current_project.get('scene_descriptions'):
-            QMessageBox.warning(self, "Warning", "No scene descriptions available")
+        """Handle generate button click"""
+        if not self.parent:
             return
         
-        # Get scene descriptions
-        scene_descriptions = self.parent.current_project['scene_descriptions']
-        
-        # Get selected style
-        style = self.style_combo.currentText()
+        # Get scene descriptions from project data
+        scene_descriptions = self.parent.current_project.get('scene_descriptions')
+        if not scene_descriptions:
+            QMessageBox.warning(self, "Warning", "No scene descriptions available")
+            return
         
         # Show progress
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.status_label.setText("Initializing image generation...")
         self.generate_button.setEnabled(False)
         self.generate_button.setText("Generating...")
+        self.status_label.setText("Initializing image generation...")
+        
+        # Get selected style
+        style = self.style_combo.currentText()
         
         # Create worker thread
         self.worker = ImageGenerationWorker(
@@ -171,20 +176,20 @@ class ImageGenerationScreen(QWidget):
         )
         
         # Connect signals
-        self.worker.finished.connect(self.on_images_generated)
         self.worker.progress.connect(self.on_generation_progress)
+        self.worker.finished.connect(self.on_generation_finished)
         self.worker.error.connect(self.on_generation_error)
         
         # Start worker
         self.worker.start()
     
-    def on_generation_progress(self, percentage, message):
-        """Handle generation progress updates"""
-        self.progress_bar.setValue(percentage)
-        self.status_label.setText(message)
+    def on_generation_progress(self, progress, status):
+        """Handle generation progress update"""
+        self.progress_bar.setValue(progress)
+        self.status_label.setText(status)
     
-    def on_images_generated(self, image_paths):
-        """Handle generated images"""
+    def on_generation_finished(self, image_paths):
+        """Handle generation finished"""
         self.image_paths = image_paths
         self.progress_bar.setVisible(False)
         self.generate_button.setEnabled(True)
