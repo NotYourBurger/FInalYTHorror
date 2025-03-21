@@ -42,7 +42,7 @@ def ensure_directories():
 # Call the function to ensure directories exist
 ensure_directories()
 
-# HTML template
+# Create a simplified HTML template
 try:
     with open("web/templates/index.html", "w") as f:
         f.write("""<!DOCTYPE html>
@@ -50,134 +50,42 @@ try:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Story Generator</title>
+    <title>Horror Story Video Generator</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Horror Story Generator</h1>
-        <p class="subtitle">Create cinematic horror videos with AI</p>
+        <h1>Horror Story Video Generator</h1>
+        <p class="subtitle">Create cinematic horror videos with AI in one click</p>
         
-        <div id="status-container">
-            <p id="status-message"></p>
+        <div class="main-controls">
+            <button id="generate-btn" class="primary-btn">Generate Horror Video</button>
         </div>
         
-        <div id="progress-container" style="display:none;">
+        <div id="status-container">
+            <h2>Status</h2>
+            <div id="terminal">
+                <div id="terminal-content"></div>
+            </div>
+        </div>
+        
+        <div id="progress-container">
             <div class="progress-bar-container">
                 <div id="progress-bar"></div>
             </div>
             <p id="progress-text">0%</p>
         </div>
         
-        <div class="workflow">
-            <div class="step" id="step1">
-                <h2>1. Story Selection</h2>
-                <div class="form-group">
-                    <label>Select Subreddits:</label>
-                    <div class="checkbox-group" id="subreddit-options">
-                        <!-- Subreddit options will be populated here -->
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Minimum Story Length:</label>
-                    <input type="range" id="min-length" min="500" max="5000" step="500" value="1000">
-                    <span id="min-length-value">1000</span> characters
-                </div>
-                <button id="fetch-stories">Fetch Stories</button>
-                
-                <div id="story-list-container" style="display:none;">
-                    <h3>Select a Story:</h3>
-                    <select id="story-list" size="5"></select>
-                    <div id="story-preview"></div>
-                    <button id="enhance-story" disabled>Enhance Story</button>
-                </div>
-            </div>
-            
-            <div class="step" id="step2" style="display:none;">
-                <h2>2. Voice Narration</h2>
-                <div class="form-group">
-                    <label>Narrator Voice:</label>
-                    <select id="voice-selection">
-                        <option value="af_bella">Bella (Horror)</option>
-                        <option value="en_joe">Joe (Male)</option>
-                        <option value="en_emily">Emily (Female)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Narration Speed:</label>
-                    <input type="range" id="voice-speed" min="0.5" max="1.2" step="0.05" value="0.85">
-                    <span id="voice-speed-value">0.85</span>
-                </div>
-                <button id="generate-narration">Generate Narration</button>
-                <div id="audio-player-container" style="display:none;">
-                    <h3>Preview Narration:</h3>
-                    <audio id="audio-player" controls></audio>
-                </div>
-            </div>
-            
-            <div class="step" id="step3" style="display:none;">
-                <h2>3. Subtitles & Images</h2>
-                <button id="generate-subtitles">Generate Subtitles</button>
-                <div id="subtitles-preview" style="display:none;">
-                    <h3>Subtitles Generated</h3>
-                    <p>Subtitles have been created and will be used in the final video.</p>
-                </div>
-                
-                <div id="image-generation" style="display:none;">
-                    <h3>Generate Images</h3>
-                    <div class="form-group">
-                        <label>Visual Style:</label>
-                        <select id="image-style">
-                            <option value="Cinematic">Cinematic</option>
-                            <option value="Realistic">Realistic</option>
-                            <option value="Artistic">Artistic</option>
-                        </select>
-                    </div>
-                    <button id="generate-images">Generate Images</button>
-                    
-                    <div id="image-grid-container" style="display:none;">
-                        <h3>Generated Images:</h3>
-                        <div id="image-grid"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="step" id="step4" style="display:none;">
-                <h2>4. Video Compilation</h2>
-                <div class="form-group">
-                    <label>Video Quality:</label>
-                    <select id="video-quality">
-                        <option value="6000k">High (6000k)</option>
-                        <option value="4000k" selected>Medium (4000k)</option>
-                        <option value="2000k">Low (2000k)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Special Effects:</label>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="dust-overlay" checked>
-                        <label for="dust-overlay">Add dust overlay effect</label>
-                    </div>
-                </div>
-                <button id="compile-video">Compile Video</button>
-                
-                <div id="video-container" style="display:none;">
-                    <h3>Preview Video:</h3>
-                    <video id="video-player" controls width="100%"></video>
-                </div>
-            </div>
-            
-            <div class="step" id="step5" style="display:none;">
-                <h2>5. Export</h2>
-                <div class="export-options">
-                    <button onclick="exportFile('video')">Export Video</button>
-                    <button onclick="exportFile('audio')">Export Audio</button>
-                    <button onclick="exportFile('subtitles')">Export Subtitles</button>
-                    <button onclick="exportFile('images')">Export Images</button>
-                    <button onclick="exportProject()">Export Complete Project</button>
-                </div>
-                
-                <div id="export-links"></div>
+        <div id="image-preview" style="display:none;">
+            <h2>Generated Images</h2>
+            <div id="image-grid"></div>
+        </div>
+        
+        <div id="video-container" style="display:none;">
+            <h2>Your Horror Video</h2>
+            <video id="video-player" controls width="100%"></video>
+            <div class="download-container">
+                <a id="download-link" class="download-btn">Download Video</a>
             </div>
         </div>
     </div>
@@ -185,41 +93,230 @@ try:
     <script src="/static/js/app.js"></script>
 </body>
 </html>""")
-    print("✓ Created index.html template")
+    print("✓ Created simplified index.html template")
 except Exception as e:
     print(f"Error creating index.html: {str(e)}")
     sys.exit(1)
 
-# Create JavaScript file
+# Create CSS file with simplified styling
+try:
+    with open("web/static/css/style.css", "w") as f:
+        f.write("""/* Base styles */
+body {
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+    color: #f0f0f0;
+    background-color: #121212;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 90%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1, h2 {
+    text-align: center;
+    margin-bottom: 10px;
+    color: #e91e63;
+}
+
+.subtitle {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #aaa;
+}
+
+/* Main controls */
+.main-controls {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.primary-btn {
+    background-color: #e91e63;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);
+    transition: all 0.3s;
+}
+
+.primary-btn:hover {
+    background-color: #d81b60;
+    box-shadow: 0 6px 12px rgba(233, 30, 99, 0.4);
+    transform: translateY(-2px);
+}
+
+.primary-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* Terminal */
+#terminal {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 20px 0;
+    height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    border: 1px solid #333;
+}
+
+#terminal-content {
+    color: #0f0;
+}
+
+.log-entry {
+    margin: 5px 0;
+    line-height: 1.4;
+}
+
+.log-error {
+    color: #ff5252;
+}
+
+.log-success {
+    color: #4caf50;
+}
+
+.log-info {
+    color: #2196f3;
+}
+
+/* Progress bar */
+.progress-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #333;
+    border-radius: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+#progress-bar {
+    height: 100%;
+    background-color: #e91e63;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#progress-text {
+    text-align: center;
+    margin: 0;
+    color: #aaa;
+}
+
+/* Image grid */
+#image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.image-container {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transition: transform 0.3s;
+}
+
+.image-container:hover {
+    transform: scale(1.05);
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Video container */
+#video-container {
+    margin: 30px 0;
+    background-color: #1e1e1e;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+#video-player {
+    width: 100%;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.download-container {
+    text-align: center;
+    margin-top: 15px;
+}
+
+.download-btn {
+    display: inline-block;
+    background-color: #4caf50;
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.download-btn:hover {
+    background-color: #43a047;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        width: 95%;
+    }
+    
+    #image-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+""")
+    print("✓ Created simplified style.css file")
+except Exception as e:
+    print(f"Error creating style.css: {str(e)}")
+    sys.exit(1)
+
+# Create JavaScript file for one-click process
 try:
     with open("web/static/js/app.js", "w") as f:
         f.write("""// Global variables
 let projectId = null;
-let selectedStoryIndex = null;
+let isGenerating = false;
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', async function() {
-    // Create a new project
-    await createProject();
-    
+document.addEventListener('DOMContentLoaded', function() {
     // Set up event listeners
-    setupEventListeners();
+    document.getElementById('generate-btn').addEventListener('click', startGeneration);
     
-    // Load subreddit options
-    await loadSubreddits();
+    // Create a new project on load
+    createProject();
     
-    // Set up range input displays
-    document.getElementById('min-length').addEventListener('input', function() {
-        document.getElementById('min-length-value').textContent = this.value;
-    });
-    
-    document.getElementById('voice-speed').addEventListener('input', function() {
-        document.getElementById('voice-speed-value').textContent = this.value;
-    });
-    
-    showStatus('Ready to begin. Select subreddits and fetch stories.', 'info');
+    // Add initial log entry
+    addLogEntry('System ready. Click "Generate Horror Video" to begin.', 'info');
 });
 
+// Create a new project
 async function createProject() {
     try {
         const response = await fetch('/api/projects', {
@@ -232,848 +329,415 @@ async function createProject() {
             projectId = data.project_id;
             console.log('Project created with ID:', projectId);
         } else {
-            showStatus('Failed to create project', 'error');
+            addLogEntry('Failed to create project: ' + data.message, 'error');
         }
     } catch (error) {
-        showStatus('Error creating project: ' + error.message, 'error');
+        addLogEntry('Error creating project: ' + error.message, 'error');
     }
 }
 
-function setupEventListeners() {
-    // Story selection
-    document.getElementById('fetch-stories').addEventListener('click', fetchStories);
-    document.getElementById('story-list').addEventListener('change', previewStory);
-    document.getElementById('enhance-story').addEventListener('click', enhanceStory);
+// Start the generation process
+async function startGeneration() {
+    if (isGenerating) return;
     
-    // Narration
-    document.getElementById('generate-narration').addEventListener('click', generateNarration);
+    isGenerating = true;
+    const generateBtn = document.getElementById('generate-btn');
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Generating...';
     
-    // Subtitles and Images
-    document.getElementById('generate-subtitles').addEventListener('click', generateSubtitles);
-    document.getElementById('generate-images').addEventListener('click', generateImages);
+    // Reset UI
+    document.getElementById('image-preview').style.display = 'none';
+    document.getElementById('video-container').style.display = 'none';
+    document.getElementById('image-grid').innerHTML = '';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-text').textContent = '0%';
+    document.getElementById('terminal-content').innerHTML = '';
     
-    // Video
-    document.getElementById('compile-video').addEventListener('click', compileVideo);
-}
-
-async function loadSubreddits() {
+    addLogEntry('Starting horror video generation process...', 'info');
+    
     try {
-        const response = await fetch('/api/subreddits');
-        const data = await response.json();
+        // Step 1: Fetch stories
+        addLogEntry('Fetching horror stories from Reddit...', 'info');
+        updateProgress(5);
         
-        if (data.success) {
-            const container = document.getElementById('subreddit-options');
-            
-            data.subreddits.forEach(subreddit => {
-                const checkboxItem = document.createElement('div');
-                checkboxItem.className = 'checkbox-item';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.id = `subreddit-${subreddit}`;
-                checkbox.value = subreddit;
-                checkbox.checked = ['nosleep', 'shortscarystories'].includes(subreddit);
-                
-                const label = document.createElement('label');
-                label.htmlFor = `subreddit-${subreddit}`;
-                label.textContent = `r/${subreddit}`;
-                
-                checkboxItem.appendChild(checkbox);
-                checkboxItem.appendChild(label);
-                container.appendChild(checkboxItem);
-            });
-        } else {
-            showStatus('Failed to load subreddits', 'error');
-        }
-    } catch (error) {
-        showStatus('Error loading subreddits: ' + error.message, 'error');
-    }
-}
-
-async function fetchStories() {
-    showStatus('Fetching stories...', 'info');
-    showProgress(true);
-    
-    // Get selected subreddits
-    const checkboxes = document.querySelectorAll('#subreddit-options input:checked');
-    const subreddits = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (subreddits.length === 0) {
-        showStatus('Please select at least one subreddit', 'error');
-        showProgress(false);
-        return;
-    }
-    
-    // Get minimum length
-    const minLength = document.getElementById('min-length').value;
-    
-    try {
-        const response = await fetch(`/api/stories?project_id=${projectId}`, {
+        const fetchResponse = await fetch(`/api/stories?project_id=${projectId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                subreddits: subreddits,
-                min_length: minLength
+                subreddits: ['nosleep', 'shortscarystories', 'creepypasta'],
+                min_length: 1500
             })
         });
         
-        const data = await response.json();
+        const fetchData = await fetchResponse.json();
         
-        if (data.success) {
-            // Populate story list
-            const storyList = document.getElementById('story-list');
-            storyList.innerHTML = '';
-            
-            data.stories.forEach((story, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = story.title;
-                storyList.appendChild(option);
-            });
-            
-            // Show story list container
-            document.getElementById('story-list-container').style.display = 'block';
-            
-            showStatus('Stories fetched successfully. Select a story to preview.', 'success');
-        } else {
-            showStatus('Failed to fetch stories: ' + data.message, 'error');
+        if (!fetchData.success) {
+            throw new Error(fetchData.message);
         }
-    } catch (error) {
-        showStatus('Error fetching stories: ' + error.message, 'error');
-    }
-    
-    showProgress(false);
-}
-
-async function previewStory() {
-    const storyList = document.getElementById('story-list');
-    selectedStoryIndex = storyList.value;
-    
-    if (selectedStoryIndex === null) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/stories/${selectedStoryIndex}?project_id=${projectId}`);
-        const data = await response.json();
         
-        if (data.success) {
-            // Show story preview
-            const preview = document.getElementById('story-preview');
-            preview.innerHTML = `
-                <h4>${data.story.title}</h4>
-                <p><strong>Author:</strong> ${data.story.author}</p>
-                <p><strong>Subreddit:</strong> r/${data.story.subreddit}</p>
-                <div class="story-content">${data.story.content.substring(0, 500)}...</div>
-            `;
-            
-            // Enable enhance button
-            document.getElementById('enhance-story').disabled = false;
-        } else {
-            showStatus('Failed to load story preview: ' + data.message, 'error');
-        }
-    } catch (error) {
-        showStatus('Error loading story preview: ' + error.message, 'error');
-    }
-}
-
-async function enhanceStory() {
-    if (selectedStoryIndex === null) {
-        showStatus('Please select a story first', 'error');
-        return;
-    }
-    
-    showStatus('Enhancing story...', 'info');
-    showProgress(true);
-    
-    try {
-        const response = await fetch(`/api/enhance?project_id=${projectId}`, {
+        addLogEntry(`Found ${fetchData.stories.length} horror stories.`, 'success');
+        
+        // Step 2: Select and enhance a story
+        addLogEntry('Selecting the best story and enhancing it...', 'info');
+        updateProgress(15);
+        
+        // Select the first story (in a real app, you might want to use a better selection algorithm)
+        const storyIndex = 0;
+        
+        const enhanceResponse = await fetch(`/api/enhance?project_id=${projectId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                story_index: selectedStoryIndex
+                story_index: storyIndex
             })
         });
         
-        const data = await response.json();
+        const enhanceData = await enhanceResponse.json();
         
-        if (data.success) {
-            // Show enhanced story
-            const preview = document.getElementById('story-preview');
-            preview.innerHTML += `
-                <h4>Enhanced Version:</h4>
-                <div class="story-content enhanced">${data.enhanced_story.substring(0, 500)}...</div>
-            `;
-            
-            // Show next step
-            document.getElementById('step2').style.display = 'block';
-            
-            showStatus('Story enhanced successfully', 'success');
-        } else {
-            showStatus('Failed to enhance story: ' + data.message, 'error');
+        if (!enhanceData.success) {
+            throw new Error(enhanceData.message);
         }
-    } catch (error) {
-        showStatus('Error enhancing story: ' + error.message, 'error');
-    }
-    
-    showProgress(false);
-}
-
-async function generateNarration() {
-    showStatus('Generating narration...', 'info');
-    showProgress(true);
-    
-    const voice = document.getElementById('voice-selection').value;
-    const speed = document.getElementById('voice-speed').value;
-    
-    try {
-        const response = await fetch(`/api/narration?project_id=${projectId}`, {
+        
+        addLogEntry('Story enhanced successfully.', 'success');
+        
+        // Step 3: Generate narration
+        addLogEntry('Generating voice narration...', 'info');
+        updateProgress(25);
+        
+        const narrationResponse = await fetch(`/api/narration?project_id=${projectId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                voice: voice,
-                speed: parseFloat(speed)
+                voice: 'af_bella',
+                speed: 0.85
             })
         });
         
-        const data = await response.json();
+        const narrationData = await narrationResponse.json();
         
-        if (data.success) {
-            // Start polling for status
-            pollNarrationStatus();
-        } else {
-            showStatus('Failed to start narration: ' + data.message, 'error');
-            showProgress(false);
+        if (!narrationData.success) {
+            throw new Error(narrationData.message);
         }
-    } catch (error) {
-        showStatus('Error generating narration: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function pollNarrationStatus() {
-    try {
-        const response = await fetch(`/api/narration/status?project_id=${projectId}`);
-        const data = await response.json();
         
-        if (data.success) {
-            // Update progress
-            updateProgress(data.progress);
-            showStatus(data.message, 'info');
-            
-            if (data.status === 'completed') {
-                // Show audio player
-                const audioPlayer = document.getElementById('audio-player');
-                audioPlayer.src = data.audio_url;
-                document.getElementById('audio-player-container').style.display = 'block';
-                
-                // Show next step
-                document.getElementById('step3').style.display = 'block';
-                
-                showStatus('Narration generated successfully', 'success');
-                showProgress(false);
-            } else if (data.status === 'error') {
-                showStatus('Error generating narration: ' + data.message, 'error');
-                showProgress(false);
-            } else {
-                // Continue polling
-                setTimeout(pollNarrationStatus, 2000);
-            }
-        } else {
-            showStatus('Failed to check narration status: ' + data.message, 'error');
-            showProgress(false);
-        }
-    } catch (error) {
-        showStatus('Error checking narration status: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function generateSubtitles() {
-    showStatus('Generating subtitles...', 'info');
-    showProgress(true);
-    
-    try {
-        const response = await fetch(`/api/subtitles?project_id=${projectId}`, {
+        // Poll for narration status
+        await pollStatus('narration', 35);
+        
+        // Step 4: Generate subtitles
+        addLogEntry('Generating subtitles...', 'info');
+        updateProgress(45);
+        
+        const subtitlesResponse = await fetch(`/api/subtitles?project_id=${projectId}`, {
             method: 'POST'
         });
         
-        const data = await response.json();
+        const subtitlesData = await subtitlesResponse.json();
         
-        if (data.success) {
-            // Start polling for status
-            pollSubtitlesStatus();
-        } else {
-            showStatus('Failed to start subtitle generation: ' + data.message, 'error');
-            showProgress(false);
+        if (!subtitlesData.success) {
+            throw new Error(subtitlesData.message);
         }
-    } catch (error) {
-        showStatus('Error generating subtitles: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function pollSubtitlesStatus() {
-    try {
-        const response = await fetch(`/api/subtitles/status?project_id=${projectId}`);
-        const data = await response.json();
         
-        if (data.success) {
-            // Update progress
-            updateProgress(data.progress);
-            showStatus(data.message, 'info');
-            
-            if (data.status === 'completed') {
-                // Show subtitles preview
-                document.getElementById('subtitles-preview').style.display = 'block';
-                
-                // Show image generation section
-                document.getElementById('image-generation').style.display = 'block';
-                
-                showStatus('Subtitles generated successfully', 'success');
-                showProgress(false);
-            } else if (data.status === 'error') {
-                showStatus('Error generating subtitles: ' + data.message, 'error');
-                showProgress(false);
-            } else {
-                // Continue polling
-                setTimeout(pollSubtitlesStatus, 2000);
-            }
-        } else {
-            showStatus('Failed to check subtitles status: ' + data.message, 'error');
-            showProgress(false);
-        }
-    } catch (error) {
-        showStatus('Error checking subtitles status: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function generateImages() {
-    showStatus('Generating images...', 'info');
-    showProgress(true);
-    
-    const style = document.getElementById('image-style').value;
-    
-    try {
-        const response = await fetch(`/api/images?project_id=${projectId}`, {
+        // Poll for subtitles status
+        await pollStatus('subtitles', 55);
+        
+        // Step 5: Generate images
+        addLogEntry('Generating cinematic horror images...', 'info');
+        updateProgress(65);
+        
+        const imagesResponse = await fetch(`/api/images?project_id=${projectId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                style: style
+                style: 'Cinematic'
             })
         });
         
-        const data = await response.json();
+        const imagesData = await imagesResponse.json();
         
-        if (data.success) {
-            // Start polling for status
-            pollImagesStatus();
-        } else {
-            showStatus('Failed to start image generation: ' + data.message, 'error');
-            showProgress(false);
+        if (!imagesData.success) {
+            throw new Error(imagesData.message);
         }
-    } catch (error) {
-        showStatus('Error generating images: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function pollImagesStatus() {
-    try {
-        const response = await fetch(`/api/images/status?project_id=${projectId}`);
-        const data = await response.json();
         
-        if (data.success) {
-            // Update progress
-            updateProgress(data.progress);
-            showStatus(data.message, 'info');
-            
-            if (data.status === 'completed') {
-                // Show image grid
-                const imageGrid = document.getElementById('image-grid');
-                imageGrid.innerHTML = '';
-                
-                data.image_urls.forEach(url => {
-                    const imgContainer = document.createElement('div');
-                    imgContainer.className = 'image-container';
-                    
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.alt = 'Generated scene';
-                    
-                    imgContainer.appendChild(img);
-                    imageGrid.appendChild(imgContainer);
-                });
-                
-                document.getElementById('image-grid-container').style.display = 'block';
-                
-                // Show next step
-                document.getElementById('step4').style.display = 'block';
-                
-                showStatus('Images generated successfully', 'success');
-                showProgress(false);
-            } else if (data.status === 'error') {
-                showStatus('Error generating images: ' + data.message, 'error');
-                showProgress(false);
-            } else {
-                // Continue polling
-                setTimeout(pollImagesStatus, 2000);
-            }
-        } else {
-            showStatus('Failed to check image generation status: ' + data.message, 'error');
-            showProgress(false);
-        }
-    } catch (error) {
-        showStatus('Error checking image generation status: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function compileVideo() {
-    showStatus('Compiling video...', 'info');
-    showProgress(true);
-    
-    const quality = document.getElementById('video-quality').value;
-    const useDustOverlay = document.getElementById('dust-overlay').checked;
-    
-    try {
-        const response = await fetch(`/api/video?project_id=${projectId}`, {
+        // Poll for images status and display them
+        const imageUrls = await pollImagesStatus(75);
+        displayImages(imageUrls);
+        
+        // Step 6: Compile video
+        addLogEntry('Compiling final horror video...', 'info');
+        updateProgress(85);
+        
+        const videoResponse = await fetch(`/api/video?project_id=${projectId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                quality: quality,
-                use_dust_overlay: useDustOverlay
+                quality: '4000k',
+                use_dust_overlay: true
             })
         });
         
-        const data = await response.json();
+        const videoData = await videoResponse.json();
         
-        if (data.success) {
-            // Start polling for status
-            pollVideoStatus();
-        } else {
-            showStatus('Failed to start video compilation: ' + data.message, 'error');
-            showProgress(false);
+        if (!videoData.success) {
+            throw new Error(videoData.message);
         }
+        
+        // Poll for video status and display it
+        const videoUrl = await pollVideoStatus(95);
+        displayVideo(videoUrl);
+        
+        // Complete
+        addLogEntry('Horror video generation complete!', 'success');
+        updateProgress(100);
+        
     } catch (error) {
-        showStatus('Error compiling video: ' + error.message, 'error');
-        showProgress(false);
+        addLogEntry('Error generating video: ' + error.message, 'error');
+        updateProgress(0);
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Horror Video';
+        isGenerating = false;
     }
 }
 
-async function pollVideoStatus() {
-    try {
-        const response = await fetch(`/api/video/status?project_id=${projectId}`);
-        const data = await response.json();
+// Poll for status of a task
+async function pollStatus(task, progressStart) {
+    return new Promise((resolve, reject) => {
+        const maxAttempts = 60; // 5 minutes max (5s intervals)
+        let attempts = 0;
         
-        if (data.success) {
-            // Update progress
-            updateProgress(data.progress);
-            showStatus(data.message, 'info');
-            
-            if (data.status === 'completed') {
-                // Show video player
-                const videoPlayer = document.getElementById('video-player');
-                videoPlayer.src = data.video_url;
-                document.getElementById('video-container').style.display = 'block';
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/api/${task}/status?project_id=${projectId}`);
+                const data = await response.json();
                 
-                // Show next step
-                document.getElementById('step5').style.display = 'block';
+                if (!data.success) {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
                 
-                showStatus('Video compiled successfully', 'success');
-                showProgress(false);
-            } else if (data.status === 'error') {
-                showStatus('Error compiling video: ' + data.message, 'error');
-                showProgress(false);
-            } else {
-                // Continue polling
-                setTimeout(pollVideoStatus, 2000);
+                // Update progress
+                const taskProgress = data.progress || 0;
+                updateProgress(progressStart + (taskProgress * 0.1)); // 10% of the total progress
+                
+                // Update log
+                if (data.message) {
+                    addLogEntry(data.message, 'info', false);
+                }
+                
+                if (data.status === 'completed') {
+                    clearInterval(interval);
+                    resolve(data);
+                    return;
+                } else if (data.status === 'error') {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
+                
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error(`${task} process timed out`));
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
             }
-        } else {
-            showStatus('Failed to check video compilation status: ' + data.message, 'error');
-            showProgress(false);
-        }
-    } catch (error) {
-        showStatus('Error checking video compilation status: ' + error.message, 'error');
-        showProgress(false);
-    }
-}
-
-async function exportFile(type) {
-    showStatus(`Preparing ${type} export...`, 'info');
-    
-    try {
-        const response = await fetch(`/api/export/${type}?project_id=${projectId}`);
-        const data = await response.json();
+        };
         
-        if (data.success) {
-            // Create download link
-            const exportLinks = document.getElementById('export-links');
-            
-            const linkContainer = document.createElement('div');
-            linkContainer.style.margin = '10px 0';
-            
-            const link = document.createElement('a');
-            link.href = data.download_url;
-            link.textContent = `Download ${type} file`;
-            link.className = 'download-link';
-            link.download = data.filename;
-            
-            linkContainer.appendChild(link);
-            exportLinks.appendChild(linkContainer);
-            
-            showStatus(`${type} export ready for download`, 'success');
-        } else {
-            showStatus(`Failed to export ${type}: ${data.message}`, 'error');
-        }
-    } catch (error) {
-        showStatus(`Error exporting ${type}: ${error.message}`, 'error');
-    }
+        const interval = setInterval(checkStatus, 5000);
+        checkStatus(); // Check immediately
+    });
 }
 
-async function exportProject() {
-    showStatus('Preparing project export...', 'info');
-    showProgress(true);
-    
-    try {
-        const response = await fetch(`/api/export/project?project_id=${projectId}`);
-        const data = await response.json();
+// Poll for images status and return image URLs
+async function pollImagesStatus(progressStart) {
+    return new Promise((resolve, reject) => {
+        const maxAttempts = 60;
+        let attempts = 0;
         
-        if (data.success) {
-            // Create download link
-            const exportLinks = document.getElementById('export-links');
-            
-            const linkContainer = document.createElement('div');
-            linkContainer.style.margin = '10px 0';
-            
-            const link = document.createElement('a');
-            link.href = data.download_url;
-            link.textContent = 'Download complete project';
-            link.className = 'download-link';
-            link.download = data.filename;
-            
-            linkContainer.appendChild(link);
-            exportLinks.appendChild(linkContainer);
-            
-            showStatus('Project export ready for download', 'success');
-        } else {
-            showStatus('Failed to export project: ' + data.message, 'error');
-        }
-    } catch (error) {
-        showStatus('Error exporting project: ' + error.message, 'error');
-    }
-    
-    showProgress(false);
-}
-
-function showStatus(message, type) {
-    const statusElement = document.getElementById('status-message');
-    statusElement.textContent = message;
-    
-    // Reset classes
-    statusElement.className = '';
-    
-    // Add appropriate class
-    if (type) {
-        statusElement.classList.add(type);
-    }
-}
-
-function showProgress(show, percent) {
-    const progressContainer = document.getElementById('progress-container');
-    
-    if (show) {
-        progressContainer.style.display = 'block';
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/api/images/status?project_id=${projectId}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
+                
+                // Update progress
+                const taskProgress = data.progress || 0;
+                updateProgress(progressStart + (taskProgress * 0.1));
+                
+                // Update log
+                if (data.message) {
+                    addLogEntry(data.message, 'info', false);
+                }
+                
+                if (data.status === 'completed') {
+                    clearInterval(interval);
+                    resolve(data.image_urls);
+                    return;
+                } else if (data.status === 'error') {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
+                
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error('Image generation timed out'));
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
+            }
+        };
         
-        if (percent !== undefined) {
-            updateProgress(percent);
-        }
+        const interval = setInterval(checkStatus, 5000);
+        checkStatus(); // Check immediately
+    });
+}
+
+// Poll for video status and return video URL
+async function pollVideoStatus(progressStart) {
+    return new Promise((resolve, reject) => {
+        const maxAttempts = 60;
+        let attempts = 0;
+        
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/api/video/status?project_id=${projectId}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
+                
+                // Update progress
+                const taskProgress = data.progress || 0;
+                updateProgress(progressStart + (taskProgress * 0.05));
+                
+                // Update log
+                if (data.message) {
+                    addLogEntry(data.message, 'info', false);
+                }
+                
+                if (data.status === 'completed') {
+                    clearInterval(interval);
+                    resolve(data.video_url);
+                    return;
+                } else if (data.status === 'error') {
+                    clearInterval(interval);
+                    reject(new Error(data.message));
+                    return;
+                }
+                
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error('Video compilation timed out'));
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
+            }
+        };
+        
+        const interval = setInterval(checkStatus, 5000);
+        checkStatus(); // Check immediately
+    });
+}
+
+// Display images in the grid
+function displayImages(imageUrls) {
+    const imageGrid = document.getElementById('image-grid');
+    imageGrid.innerHTML = '';
+    
+    imageUrls.forEach(url => {
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'image-container';
+        
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Generated horror scene';
+        img.loading = 'lazy';
+        
+        imgContainer.appendChild(img);
+        imageGrid.appendChild(imgContainer);
+    });
+    
+    document.getElementById('image-preview').style.display = 'block';
+    
+    // Scroll to images
+    document.getElementById('image-preview').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Display the final video
+function displayVideo(videoUrl) {
+    const videoPlayer = document.getElementById('video-player');
+    videoPlayer.src = videoUrl;
+    
+    const downloadLink = document.getElementById('download-link');
+    downloadLink.href = videoUrl;
+    downloadLink.download = 'horror_video.mp4';
+    
+    document.getElementById('video-container').style.display = 'block';
+    
+    // Scroll to video
+    document.getElementById('video-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Add a log entry to the terminal
+function addLogEntry(message, type = 'info', newLine = true) {
+    const terminal = document.getElementById('terminal-content');
+    
+    const entry = document.createElement('div');
+    entry.className = `log-entry log-${type}`;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    entry.textContent = `[${timestamp}] ${message}`;
+    
+    if (newLine || terminal.children.length === 0) {
+        terminal.appendChild(entry);
     } else {
-        progressContainer.style.display = 'none';
+        // Replace the last entry
+        terminal.replaceChild(entry, terminal.lastChild);
     }
+    
+    // Scroll to bottom
+    terminal.scrollTop = terminal.scrollHeight;
 }
 
+// Update the progress bar
 function updateProgress(percent) {
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     
+    percent = Math.min(100, Math.max(0, percent)); // Clamp between 0-100
+    
     progressBar.style.width = `${percent}%`;
-    progressText.textContent = `${percent}%`;
+    progressText.textContent = `${Math.round(percent)}%`;
 }
 """)
-    print("✓ Created app.js file")
+    print("✓ Created simplified app.js file")
 except Exception as e:
     print(f"Error creating app.js: {str(e)}")
-    sys.exit(1)
-
-# Create CSS file
-try:
-    with open("web/static/css/style.css", "w") as f:
-        f.write("""/* Base styles */
-body {
-    font-family: 'Arial', sans-serif;
-    line-height: 1.6;
-    color: #333;
-    background-color: #f4f4f4;
-    margin: 0;
-    padding: 0;
-}
-
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-h1 {
-    text-align: center;
-    margin-bottom: 10px;
-}
-
-.subtitle {
-    text-align: center;
-    margin-bottom: 30px;
-    color: #666;
-}
-
-/* Status messages */
-#status-container {
-    margin: 20px 0;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: #f8f8f8;
-}
-
-#status-message {
-    margin: 0;
-    padding: 5px;
-}
-
-#status-message.error {
-    color: #d9534f;
-    background-color: #f2dede;
-    border-left: 4px solid #d9534f;
-    padding-left: 10px;
-}
-
-#status-message.success {
-    color: #5cb85c;
-    background-color: #dff0d8;
-    border-left: 4px solid #5cb85c;
-    padding-left: 10px;
-}
-
-#status-message.info {
-    color: #5bc0de;
-    background-color: #d9edf7;
-    border-left: 4px solid #5bc0de;
-    padding-left: 10px;
-}
-
-/* Progress bar */
-.progress-bar-container {
-    width: 100%;
-    height: 20px;
-    background-color: #f0f0f0;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    overflow: hidden;
-}
-
-#progress-bar {
-    height: 100%;
-    background-color: #4CAF50;
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-#progress-text {
-    text-align: center;
-    margin: 0;
-}
-
-/* Workflow steps */
-.workflow {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.step {
-    background-color: white;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.step h2 {
-    margin-top: 0;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-}
-
-/* Form elements */
-.form-group {
-    margin-bottom: 15px;
-}
-
-label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-input[type="range"] {
-    width: 100%;
-}
-
-select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s;
-}
-
-button:hover {
-    background-color: #45a049;
-}
-
-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-/* Checkbox groups */
-.checkbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.checkbox-item {
-    display: flex;
-    align-items: center;
-    margin-right: 15px;
-}
-
-.checkbox-item input {
-    margin-right: 5px;
-}
-
-/* Story list and preview */
-#story-list {
-    width: 100%;
-    margin-bottom: 15px;
-}
-
-#story-preview {
-    background-color: #f9f9f9;
-    padding: 15px;
-    border-radius: 4px;
-    margin-bottom: 15px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.story-content {
-    white-space: pre-line;
-    line-height: 1.5;
-}
-
-.story-content.enhanced {
-    border-left: 3px solid #4CAF50;
-    padding-left: 10px;
-}
-
-/* Audio player */
-#audio-player {
-    width: 100%;
-    margin-top: 10px;
-}
-
-/* Image grid */
-#image-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 15px;
-    margin-top: 15px;
-}
-
-.image-container {
-    border-radius: 4px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.image-container img {
-    width: 100%;
-    height: auto;
-    display: block;
-}
-
-/* Export options */
-.export-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.download-link {
-    display: inline-block;
-    background-color: #2196F3;
-    color: white;
-    padding: 10px 15px;
-    text-decoration: none;
-    border-radius: 4px;
-    margin-top: 5px;
-}
-
-.download-link:hover {
-    background-color: #0b7dda;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-    .container {
-        width: 95%;
-    }
-    
-    .export-options {
-        flex-direction: column;
-    }
-    
-    #image-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    }
-}
-""")
-    print("✓ Created style.css file")
-except Exception as e:
-    print(f"Error creating style.css: {str(e)}")
     sys.exit(1)
 
 # Mock services for demonstration
