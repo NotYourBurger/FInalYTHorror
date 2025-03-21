@@ -2,7 +2,7 @@ import os
 import numpy as np
 import soundfile as sf
 import whisper
-from whisper.utils import WriteSRT
+import datetime
 
 class AudioService:
     """Service for audio generation and processing"""
@@ -64,10 +64,35 @@ class AudioService:
         # Save SRT file
         srt_path = os.path.join("output/subtitles", "subtitles.srt")
         with open(srt_path, "w", encoding="utf-8") as srt_file:
-            writer = WriteSRT("output/subtitles")
-            writer.write_result(result, srt_file)
+            self.write_srt(result["segments"], srt_file)
         
         return srt_path
+    
+    def write_srt(self, segments, file):
+        """Write SRT file from segments"""
+        for i, segment in enumerate(segments, start=1):
+            # Write segment number
+            print(f"{i}", file=file)
+            
+            # Format timestamps (SRT format: HH:MM:SS,mmm)
+            start = self.format_timestamp(segment["start"])
+            end = self.format_timestamp(segment["end"])
+            
+            # Write timestamps
+            print(f"{start} --> {end}", file=file)
+            
+            # Write text
+            print(f"{segment['text'].strip()}", file=file)
+            
+            # Empty line between entries
+            print("", file=file)
+    
+    def format_timestamp(self, seconds):
+        """Format seconds to SRT timestamp format (HH:MM:SS,mmm)"""
+        milliseconds = int((seconds % 1) * 1000)
+        hours, remainder = divmod(int(seconds), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
     
     def parse_srt_timestamps(self, srt_path):
         """Parse SRT file and extract timestamps with text"""
