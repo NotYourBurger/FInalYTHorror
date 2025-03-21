@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 from moviepy.editor import *
+import traceback
 
 class VideoService:
     """Service for video generation and processing"""
@@ -148,10 +149,25 @@ class VideoService:
                 try:
                     print("Adding subtitles from: " + srt_path)
                     
+                    # First try to use a better font for subtitles
+                    subtitle_font = 'Arial-Bold'  # Default fallback
+                    
+                    # Try to find a better font on the system
+                    try:
+                        import matplotlib.font_manager as fm
+                        fonts = fm.findSystemFonts()
+                        for font in fonts:
+                            if 'arial' in font.lower() and 'bold' in font.lower():
+                                subtitle_font = font
+                                break
+                        print(f"Using font: {subtitle_font}")
+                    except Exception as font_error:
+                        print(f"Could not find system fonts: {str(font_error)}")
+                    
                     # Create subtitle generator with improved settings
                     generator = lambda txt: TextClip(
                         txt,
-                        font='Arial-Bold',
+                        font=subtitle_font,
                         fontsize=40,  # Larger size for better visibility
                         color='white',
                         stroke_color='black',
@@ -170,6 +186,7 @@ class VideoService:
                     print("Subtitles added successfully")
                 except Exception as e:
                     print(f"Error adding subtitles: {str(e)}")
+                    traceback.print_exc()  # Print detailed error information
             
             # Create a list of clips to composite
             clips_to_composite = [video]
