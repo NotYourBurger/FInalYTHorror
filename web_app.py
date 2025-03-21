@@ -143,6 +143,628 @@ with open("web/templates/index.html", "w") as f:
 </body>
 </html>""")
 
+# Create JavaScript file
+with open("web/static/js/app.js", "w") as f:
+    f.write("""// Global variables
+let projectId = null;
+let selectedStoryIndex = null;
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async function() {
+    // Create a new project
+    await createProject();
+    
+    // Set up event listeners
+    setupEventListeners();
+    
+    // Load subreddit options
+    await loadSubreddits();
+    
+    // Set up range input displays
+    document.getElementById('min-length').addEventListener('input', function() {
+        document.getElementById('min-length-value').textContent = this.value;
+    });
+    
+    document.getElementById('voice-speed').addEventListener('input', function() {
+        document.getElementById('voice-speed-value').textContent = this.value;
+    });
+    
+    showStatus('Ready to begin. Select subreddits and fetch stories.', 'info');
+});
+
+async function createProject() {
+    try {
+        const response = await fetch('/api/projects', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            projectId = data.project_id;
+            console.log('Project created with ID:', projectId);
+        } else {
+            showStatus('Failed to create project', 'error');
+        }
+    } catch (error) {
+        showStatus('Error creating project: ' + error.message, 'error');
+    }
+}
+
+function setupEventListeners() {
+    // Story selection
+    document.getElementById('fetch-stories').addEventListener('click', fetchStories);
+    document.getElementById('story-list').addEventListener('change', previewStory);
+    document.getElementById('enhance-story').addEventListener('click', enhanceStory);
+    
+    // Narration
+    document.getElementById('generate-narration').addEventListener('click', generateNarration);
+    
+    // Subtitles and Images
+    document.getElementById('generate-subtitles').addEventListener('click', generateSubtitles);
+    document.getElementById('generate-images').addEventListener('click', generateImages);
+    
+    // Video
+    document.getElementById('compile-video').addEventListener('click', compileVideo);
+}
+
+async function loadSubreddits() {
+    try {
+        const response = await fetch('/api/subreddits');
+        const data = await response.json();
+        
+        if (data.success) {
+            const container = document.getElementById('subreddit-options');
+            
+            data.subreddits.forEach(subreddit => {
+                const checkboxItem = document.createElement('div');
+                checkboxItem.className = 'checkbox-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `subreddit-${subreddit}`;
+                checkbox.value = subreddit;
+                checkbox.checked = ['nosleep', 'shortscarystories'].includes(subreddit);
+                
+                const label = document.createElement('label');
+                label.htmlFor = `subreddit-${subreddit}`;
+                label.textContent = `r/${subreddit}`;
+                
+                checkboxItem.appendChild(checkbox);
+                checkboxItem.appendChild(label);
+                container.appendChild(checkboxItem);
+            });
+        } else {
+            showStatus('Failed to load subreddits', 'error');
+        }
+    } catch (error) {
+        showStatus('Error loading subreddits: ' + error.message, 'error');
+    }
+}
+
+async function fetchStories() {
+    showStatus('Fetching stories...', 'info');
+    showProgress(true);
+    
+    // Get selected subreddits
+    const checkboxes = document.querySelectorAll('#subreddit-options input:checked');
+    const subreddits = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (subreddits.length === 0) {
+        showStatus('Please select at least one subreddit', 'error');
+        showProgress(false);
+        return;
+    }
+    
+    // Get minimum length
+    const minLength = document.getElementById('min-length').value;
+    
+    try {
+        const response = await fetch(`/api/stories?project_id=${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                subreddits: subreddits,
+                min_length: minLength
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Populate story list
+            const storyList = document.getElementById('story-list');
+            storyList.innerHTML = '';
+            
+            data.stories.forEach((story, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = story.title;
+                storyList.appendChild(option);
+            });
+            
+            // Show story list container
+            document.getElementById('story-list-container').style.display = 'block';
+            
+            showStatus('Stories fetched successfully. Select a story to preview.', 'success');
+        } else {
+            showStatus('Failed to fetch stories: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showStatus('Error fetching stories: ' + error.message, 'error');
+    }
+    
+    showProgress(false);
+}
+
+async function previewStory() {
+    const storyList = document.getElementById('story-list');
+    selectedStoryIndex = storyList.value;
+    
+    if (selectedStoryIndex === null) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/stories/${selectedStoryIndex}?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show story preview
+            const preview = document.getElementById('story-preview');
+            preview.innerHTML = `
+                <h4>${data.story.title}</h4>
+                <p><strong>Author:</strong> ${data.story.author}</p>
+                <p><strong>Subreddit:</strong> r/${data.story.subreddit}</p>
+                <div class="story-content">${data.story.content.substring(0, 500)}...</div>
+            `;
+            
+            // Enable enhance button
+            document.getElementById('enhance-story').disabled = false;
+        } else {
+            showStatus('Failed to load story preview: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showStatus('Error loading story preview: ' + error.message, 'error');
+    }
+}
+
+async function enhanceStory() {
+    if (selectedStoryIndex === null) {
+        showStatus('Please select a story first', 'error');
+        return;
+    }
+    
+    showStatus('Enhancing story...', 'info');
+    showProgress(true);
+    
+    try {
+        const response = await fetch(`/api/enhance?project_id=${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                story_index: selectedStoryIndex
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show enhanced story
+            const preview = document.getElementById('story-preview');
+            preview.innerHTML += `
+                <h4>Enhanced Version:</h4>
+                <div class="story-content enhanced">${data.enhanced_story.substring(0, 500)}...</div>
+            `;
+            
+            // Show next step
+            document.getElementById('step2').style.display = 'block';
+            
+            showStatus('Story enhanced successfully', 'success');
+        } else {
+            showStatus('Failed to enhance story: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showStatus('Error enhancing story: ' + error.message, 'error');
+    }
+    
+    showProgress(false);
+}
+
+async function generateNarration() {
+    showStatus('Generating narration...', 'info');
+    showProgress(true);
+    
+    const voice = document.getElementById('voice-selection').value;
+    const speed = document.getElementById('voice-speed').value;
+    
+    try {
+        const response = await fetch(`/api/narration?project_id=${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                voice: voice,
+                speed: parseFloat(speed)
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Start polling for status
+            pollNarrationStatus();
+        } else {
+            showStatus('Failed to start narration: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error generating narration: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function pollNarrationStatus() {
+    try {
+        const response = await fetch(`/api/narration/status?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update progress
+            updateProgress(data.progress);
+            showStatus(data.message, 'info');
+            
+            if (data.status === 'completed') {
+                // Show audio player
+                const audioPlayer = document.getElementById('audio-player');
+                audioPlayer.src = data.audio_url;
+                document.getElementById('audio-player-container').style.display = 'block';
+                
+                // Show next step
+                document.getElementById('step3').style.display = 'block';
+                
+                showStatus('Narration generated successfully', 'success');
+                showProgress(false);
+            } else if (data.status === 'error') {
+                showStatus('Error generating narration: ' + data.message, 'error');
+                showProgress(false);
+            } else {
+                // Continue polling
+                setTimeout(pollNarrationStatus, 2000);
+            }
+        } else {
+            showStatus('Failed to check narration status: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error checking narration status: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function generateSubtitles() {
+    showStatus('Generating subtitles...', 'info');
+    showProgress(true);
+    
+    try {
+        const response = await fetch(`/api/subtitles?project_id=${projectId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Start polling for status
+            pollSubtitlesStatus();
+        } else {
+            showStatus('Failed to start subtitle generation: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error generating subtitles: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function pollSubtitlesStatus() {
+    try {
+        const response = await fetch(`/api/subtitles/status?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update progress
+            updateProgress(data.progress);
+            showStatus(data.message, 'info');
+            
+            if (data.status === 'completed') {
+                // Show subtitles preview
+                document.getElementById('subtitles-preview').style.display = 'block';
+                
+                // Show image generation section
+                document.getElementById('image-generation').style.display = 'block';
+                
+                showStatus('Subtitles generated successfully', 'success');
+                showProgress(false);
+            } else if (data.status === 'error') {
+                showStatus('Error generating subtitles: ' + data.message, 'error');
+                showProgress(false);
+            } else {
+                // Continue polling
+                setTimeout(pollSubtitlesStatus, 2000);
+            }
+        } else {
+            showStatus('Failed to check subtitles status: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error checking subtitles status: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function generateImages() {
+    showStatus('Generating images...', 'info');
+    showProgress(true);
+    
+    const style = document.getElementById('image-style').value;
+    
+    try {
+        const response = await fetch(`/api/images?project_id=${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                style: style
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Start polling for status
+            pollImagesStatus();
+        } else {
+            showStatus('Failed to start image generation: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error generating images: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function pollImagesStatus() {
+    try {
+        const response = await fetch(`/api/images/status?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update progress
+            updateProgress(data.progress);
+            showStatus(data.message, 'info');
+            
+            if (data.status === 'completed') {
+                // Show image grid
+                const imageGrid = document.getElementById('image-grid');
+                imageGrid.innerHTML = '';
+                
+                data.image_urls.forEach(url => {
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'image-container';
+                    
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = 'Generated scene';
+                    
+                    imgContainer.appendChild(img);
+                    imageGrid.appendChild(imgContainer);
+                });
+                
+                document.getElementById('image-grid-container').style.display = 'block';
+                
+                // Show next step
+                document.getElementById('step4').style.display = 'block';
+                
+                showStatus('Images generated successfully', 'success');
+                showProgress(false);
+            } else if (data.status === 'error') {
+                showStatus('Error generating images: ' + data.message, 'error');
+                showProgress(false);
+            } else {
+                // Continue polling
+                setTimeout(pollImagesStatus, 2000);
+            }
+        } else {
+            showStatus('Failed to check image generation status: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error checking image generation status: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function compileVideo() {
+    showStatus('Compiling video...', 'info');
+    showProgress(true);
+    
+    const quality = document.getElementById('video-quality').value;
+    const useDustOverlay = document.getElementById('dust-overlay').checked;
+    
+    try {
+        const response = await fetch(`/api/video?project_id=${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                quality: quality,
+                use_dust_overlay: useDustOverlay
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Start polling for status
+            pollVideoStatus();
+        } else {
+            showStatus('Failed to start video compilation: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error compiling video: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function pollVideoStatus() {
+    try {
+        const response = await fetch(`/api/video/status?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update progress
+            updateProgress(data.progress);
+            showStatus(data.message, 'info');
+            
+            if (data.status === 'completed') {
+                // Show video player
+                const videoPlayer = document.getElementById('video-player');
+                videoPlayer.src = data.video_url;
+                document.getElementById('video-container').style.display = 'block';
+                
+                // Show next step
+                document.getElementById('step5').style.display = 'block';
+                
+                showStatus('Video compiled successfully', 'success');
+                showProgress(false);
+            } else if (data.status === 'error') {
+                showStatus('Error compiling video: ' + data.message, 'error');
+                showProgress(false);
+            } else {
+                // Continue polling
+                setTimeout(pollVideoStatus, 2000);
+            }
+        } else {
+            showStatus('Failed to check video compilation status: ' + data.message, 'error');
+            showProgress(false);
+        }
+    } catch (error) {
+        showStatus('Error checking video compilation status: ' + error.message, 'error');
+        showProgress(false);
+    }
+}
+
+async function exportFile(type) {
+    showStatus(`Preparing ${type} export...`, 'info');
+    
+    try {
+        const response = await fetch(`/api/export/${type}?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download link
+            const exportLinks = document.getElementById('export-links');
+            
+            const linkContainer = document.createElement('div');
+            linkContainer.style.margin = '10px 0';
+            
+            const link = document.createElement('a');
+            link.href = data.download_url;
+            link.textContent = `Download ${type} file`;
+            link.className = 'download-link';
+            link.download = data.filename;
+            
+            linkContainer.appendChild(link);
+            exportLinks.appendChild(linkContainer);
+            
+            showStatus(`${type} export ready for download`, 'success');
+        } else {
+            showStatus(`Failed to export ${type}: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        showStatus(`Error exporting ${type}: ${error.message}`, 'error');
+    }
+}
+
+async function exportProject() {
+    showStatus('Preparing project export...', 'info');
+    showProgress(true);
+    
+    try {
+        const response = await fetch(`/api/export/project?project_id=${projectId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download link
+            const exportLinks = document.getElementById('export-links');
+            
+            const linkContainer = document.createElement('div');
+            linkContainer.style.margin = '10px 0';
+            
+            const link = document.createElement('a');
+            link.href = data.download_url;
+            link.textContent = 'Download complete project';
+            link.className = 'download-link';
+            link.download = data.filename;
+            
+            linkContainer.appendChild(link);
+            exportLinks.appendChild(linkContainer);
+            
+            showStatus('Project export ready for download', 'success');
+        } else {
+            showStatus('Failed to export project: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showStatus('Error exporting project: ' + error.message, 'error');
+    }
+    
+    showProgress(false);
+}
+
+function showStatus(message, type) {
+    const statusElement = document.getElementById('status-message');
+    statusElement.textContent = message;
+    
+    // Reset classes
+    statusElement.className = '';
+    
+    // Add appropriate class
+    if (type) {
+        statusElement.classList.add(type);
+    }
+}
+
+function showProgress(show, percent) {
+    const progressContainer = document.getElementById('progress-container');
+    
+    if (show) {
+        progressContainer.style.display = 'block';
+        
+        if (percent !== undefined) {
+            updateProgress(percent);
+        }
+    } else {
+        progressContainer.style.display = 'none';
+    }
+}
+
+function updateProgress(percent) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    
+    progressBar.style.width = `${percent}%`;
+    progressText.textContent = `${percent}%`;
+}
+""")
+
 # API routes
 @app.route('/')
 def index():
