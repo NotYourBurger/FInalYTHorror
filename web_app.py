@@ -13,6 +13,19 @@ app = Flask(__name__,
             static_folder=os.path.abspath("web/static"))
 CORS(app)  # Enable CORS for all routes
 
+# Global variables to track generation status
+generation_status = {
+    'status': 'idle',
+    'progress': 0,
+    'message': '',
+    'level': 'info',
+    'images': [],
+    'video': None
+}
+
+# Background thread for generation
+generation_thread = None
+
 # Ensure all required directories exist
 def ensure_directories():
     """Create all necessary directories for the application."""
@@ -464,29 +477,78 @@ except Exception as e:
     print(f"Error creating app.js: {str(e)}")
     sys.exit(1)
 
-# Import the prototype.py functions
-try:
-    from prototype import fetch_and_enhance_nosleep_story, generate_voice_narration, generate_subtitles_from_audio
-    from prototype import generate_scene_descriptions, generate_image_prompts, generate_images_from_prompts
-    from prototype import compile_video, run_complete_pipeline
-    print("✓ Successfully imported functions from prototype.py")
-except ImportError as e:
-    print(f"Error importing from prototype.py: {str(e)}")
-    print("Make sure prototype.py is in the same directory as web_app.py")
-    sys.exit(1)
-
-# Global variables to track generation status
-generation_status = {
-    'status': 'idle',
-    'progress': 0,
-    'message': '',
-    'level': 'info',
-    'images': [],
-    'video': None
-}
-
-# Background thread for generation
-generation_thread = None
+# Function to run the generation process
+def run_generation():
+    global generation_status
+    
+    try:
+        # Update status
+        generation_status['message'] = 'Initializing horror video generation...'
+        generation_status['progress'] = 5
+        
+        # Try to import the prototype functions
+        try:
+            # Import the prototype.py module directly
+            import prototype
+            
+            # Update status
+            generation_status['message'] = 'Running complete horror video generation pipeline...'
+            generation_status['progress'] = 10
+            
+            # Define a callback function to update progress
+            def progress_callback(message, progress, level='info'):
+                generation_status['message'] = message
+                generation_status['progress'] = progress
+                generation_status['level'] = level
+                
+                # If we have image paths, update the images list
+                if 'image_paths' in generation_status and generation_status['image_paths']:
+                    image_urls = [f'/output/images/{os.path.basename(img)}' for img in generation_status['image_paths']]
+                    generation_status['images'] = image_urls
+            
+            # Run the complete pipeline from prototype.py
+            results = prototype.run_complete_pipeline()
+            
+            if results:
+                # Update status with results
+                generation_status['status'] = 'completed'
+                generation_status['progress'] = 100
+                generation_status['message'] = 'Horror video generation complete!'
+                generation_status['level'] = 'success'
+                
+                # Set image paths
+                if 'image_paths' in results and results['image_paths']:
+                    image_urls = [f'/output/images/{os.path.basename(img)}' for img in results['image_paths']]
+                    generation_status['images'] = image_urls
+                
+                # Set video path
+                if 'video_path' in results and results['video_path']:
+                    generation_status['video'] = f'/output/videos/{os.path.basename(results["video_path"])}'
+            else:
+                # Update status with error
+                generation_status['status'] = 'error'
+                generation_status['message'] = 'Failed to generate horror video'
+                generation_status['level'] = 'error'
+                
+        except ImportError as e:
+            # Handle import error
+            error_message = f"Error importing prototype.py: {str(e)}"
+            print(error_message)
+            
+            # Check if huggingface_hub is the issue
+            if 'huggingface_hub' in str(e):
+                error_message += "\n\nTry installing the correct version of huggingface_hub: pip install --upgrade huggingface_hub"
+            
+            generation_status['status'] = 'error'
+            generation_status['message'] = error_message
+            generation_status['level'] = 'error'
+            
+    except Exception as e:
+        # Update status with error
+        generation_status['status'] = 'error'
+        generation_status['message'] = f'Error: {str(e)}'
+        generation_status['level'] = 'error'
+        print(f"Error in generation thread: {str(e)}")
 
 # Routes
 @app.route('/')
@@ -539,56 +601,6 @@ def serve_static(path):
         return send_from_directory('web/static', path)
     except Exception as e:
         return jsonify({'error': str(e)}), 404
-
-# Function to run the generation process
-def run_generation():
-    global generation_status
-    
-    try:
-        # Update status
-        generation_status['message'] = 'Running complete horror video generation pipeline...'
-        
-        # Define a callback function to update progress
-        def progress_callback(message, progress, level='info'):
-            generation_status['message'] = message
-            generation_status['progress'] = progress
-            generation_status['level'] = level
-            
-            # If we have image paths, update the images list
-            if 'image_paths' in generation_status and generation_status['image_paths']:
-                image_urls = [f'/output/images/{os.path.basename(img)}' for img in generation_status['image_paths']]
-                generation_status['images'] = image_urls
-        
-        # Run the complete pipeline from prototype.py
-        results = run_complete_pipeline(progress_callback=progress_callback)
-        
-        if results:
-            # Update status with results
-            generation_status['status'] = 'completed'
-            generation_status['progress'] = 100
-            generation_status['message'] = 'Horror video generation complete!'
-            generation_status['level'] = 'success'
-            
-            # Set image paths
-            if 'image_paths' in results and results['image_paths']:
-                image_urls = [f'/output/images/{os.path.basename(img)}' for img in results['image_paths']]
-                generation_status['images'] = image_urls
-            
-            # Set video path
-            if 'video_path' in results and results['video_path']:
-                generation_status['video'] = f'/output/videos/{os.path.basename(results["video_path"])}'
-        else:
-            # Update status with error
-            generation_status['status'] = 'error'
-            generation_status['message'] = 'Failed to generate horror video'
-            generation_status['level'] = 'error'
-    
-    except Exception as e:
-        # Update status with error
-        generation_status['status'] = 'error'
-        generation_status['message'] = f'Error: {str(e)}'
-        generation_status['level'] = 'error'
-        print(f"Error in generation thread: {str(e)}")
 
 # Main function to run the app
 def main():
