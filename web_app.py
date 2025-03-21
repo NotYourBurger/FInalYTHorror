@@ -4,12 +4,14 @@ import sys
 import uuid
 import threading
 import json
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import waitress
 
-# Create Flask app
-app = Flask(__name__)
+# Create Flask app with correct template folder
+app = Flask(__name__, 
+            template_folder=os.path.abspath("web/templates"),
+            static_folder=os.path.abspath("web/static"))
 CORS(app)  # Enable CORS for all routes
 
 # Dictionary to store active projects
@@ -1127,8 +1129,9 @@ video_service = MockVideoService()
 @app.route('/')
 def index():
     try:
-        return render_template('index.html')
+        return send_from_directory('web/templates', 'index.html')
     except Exception as e:
+        print(f"Error serving index.html: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects', methods=['POST'])
