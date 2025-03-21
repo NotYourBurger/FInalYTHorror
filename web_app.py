@@ -356,57 +356,26 @@ async function startGeneration() {
     addLogEntry('Starting horror video generation process...', 'info');
     
     try {
-        // Step 1: Fetch stories
-        addLogEntry('Fetching horror stories from Reddit...', 'info');
-        updateProgress(5);
+        // Step 1: Generate complete story (fetch, select, and enhance)
+        addLogEntry('Fetching and enhancing horror story...', 'info');
+        updateProgress(10);
         
-        const fetchResponse = await fetch(`/api/stories?project_id=${projectId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                subreddits: ['nosleep', 'shortscarystories', 'creepypasta'],
-                min_length: 1500
-            })
+        const storyResponse = await fetch(`/api/generate_story?project_id=${projectId}`, {
+            method: 'POST'
         });
         
-        const fetchData = await fetchResponse.json();
+        const storyData = await storyResponse.json();
         
-        if (!fetchData.success) {
-            throw new Error(fetchData.message);
+        if (!storyData.success) {
+            throw new Error(storyData.message);
         }
         
-        addLogEntry(`Found ${fetchData.stories.length} horror stories.`, 'success');
+        addLogEntry(`Story selected: "${storyData.title}"`, 'success');
+        updateProgress(20);
         
-        // Step 2: Select and enhance a story
-        addLogEntry('Selecting the best story and enhancing it...', 'info');
-        updateProgress(15);
-        
-        // Select the first story (in a real app, you might want to use a better selection algorithm)
-        const storyIndex = 0;
-        
-        const enhanceResponse = await fetch(`/api/enhance?project_id=${projectId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                story_index: storyIndex
-            })
-        });
-        
-        const enhanceData = await enhanceResponse.json();
-        
-        if (!enhanceData.success) {
-            throw new Error(enhanceData.message);
-        }
-        
-        addLogEntry('Story enhanced successfully.', 'success');
-        
-        // Step 3: Generate narration
+        // Step 2: Generate narration
         addLogEntry('Generating voice narration...', 'info');
-        updateProgress(25);
+        updateProgress(30);
         
         const narrationResponse = await fetch(`/api/narration?project_id=${projectId}`, {
             method: 'POST',
@@ -426,11 +395,11 @@ async function startGeneration() {
         }
         
         // Poll for narration status
-        await pollStatus('narration', 35);
+        await pollStatus('narration', 40);
         
-        // Step 4: Generate subtitles
-        addLogEntry('Generating subtitles...', 'info');
-        updateProgress(45);
+        // Step 3: Generate subtitles
+        addLogEntry('Generating subtitles and scene descriptions...', 'info');
+        updateProgress(50);
         
         const subtitlesResponse = await fetch(`/api/subtitles?project_id=${projectId}`, {
             method: 'POST'
@@ -443,20 +412,14 @@ async function startGeneration() {
         }
         
         // Poll for subtitles status
-        await pollStatus('subtitles', 55);
+        await pollStatus('subtitles', 60);
         
-        // Step 5: Generate images
+        // Step 4: Generate images
         addLogEntry('Generating cinematic horror images...', 'info');
-        updateProgress(65);
+        updateProgress(70);
         
         const imagesResponse = await fetch(`/api/images?project_id=${projectId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                style: 'Cinematic'
-            })
+            method: 'POST'
         });
         
         const imagesData = await imagesResponse.json();
@@ -466,22 +429,15 @@ async function startGeneration() {
         }
         
         // Poll for images status and display them
-        const imageUrls = await pollImagesStatus(75);
+        const imageUrls = await pollImagesStatus(80);
         displayImages(imageUrls);
         
-        // Step 6: Compile video
+        // Step 5: Compile video
         addLogEntry('Compiling final horror video...', 'info');
-        updateProgress(85);
+        updateProgress(90);
         
         const videoResponse = await fetch(`/api/video?project_id=${projectId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                quality: '4000k',
-                use_dust_overlay: true
-            })
+            method: 'POST'
         });
         
         const videoData = await videoResponse.json();
@@ -1251,6 +1207,34 @@ def video_status():
         'progress': task['progress'],
         'message': task['message']
     })
+
+@app.route('/api/generate_story', methods=['POST'])
+def generate_story():
+    project_id = request.args.get('project_id')
+    if not project_id or project_id not in active_projects:
+        return jsonify({'success': False, 'message': 'Invalid project ID'})
+    
+    try:
+        # This would call your fetch_and_enhance_nosleep_story function from prototype.py
+        # For now, we'll use a mock implementation
+        story_data = {
+            'title': 'The Shadows That Follow',
+            'original': 'Original story content...',
+            'enhanced': 'Enhanced story with intro and outro...',
+            'subreddit': 'nosleep',
+            'story_id': 'abc123'
+        }
+        
+        # Store the story data in the project
+        active_projects[project_id]['story_data'] = story_data
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Story generated successfully',
+            'title': story_data['title']
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 # Serve output files
 @app.route('/output/<path:filename>')
