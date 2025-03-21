@@ -1215,14 +1215,140 @@ def generate_story():
         return jsonify({'success': False, 'message': 'Invalid project ID'})
     
     try:
-        # This would call your fetch_and_enhance_nosleep_story function from prototype.py
-        # For now, we'll use a mock implementation
+        # Import necessary modules from prototype.py
+        import praw
+        from google import genai
+        import random
+        import os
+        
+        # Initialize Reddit client
+        reddit = praw.Reddit(
+            client_id="Jf3jkA3Y0dBCfluYvS8aVw",
+            client_secret="1dWKIP6ME7FBR66motXS6273rkkf0g",
+            user_agent="Horror Stories by Wear_Severe"
+        )
+        
+        # Initialize Gemini API
+        client = genai.Client(api_key="AIzaSyD_vBSluRNPI6z7JoKfl67M6D3DCq4l0NI")
+        
+        # Horror subreddits
+        horror_subreddits = [
+            "nosleep", 
+            "shortscarystories", 
+            "creepypasta", 
+            "LetsNotMeet",
+            "DarkTales",
+            "TheCrypticCompendium",
+            "libraryofshadows",
+            "scarystories"
+        ]
+        
+        # Randomly select 2-3 subreddits to fetch from
+        selected_subreddits = random.sample(horror_subreddits, min(3, len(horror_subreddits)))
+        
+        # Fetch stories from selected subreddits
+        all_posts = []
+        for subreddit_name in selected_subreddits:
+            try:
+                subreddit = reddit.subreddit(subreddit_name)
+                posts = list(subreddit.top("week", limit=30))
+                all_posts.extend(posts)
+                addLogEntry(project_id, f"Fetched {len(posts)} stories from r/{subreddit_name}", "info")
+            except Exception as e:
+                addLogEntry(project_id, f"Error fetching from r/{subreddit_name}: {str(e)}", "error")
+        
+        # Shuffle posts to randomize selection
+        random.shuffle(all_posts)
+        
+        # Filter out very short posts and previously used posts
+        cache_file = "used_story_ids.txt"
+        used_ids = set()
+        
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r') as f:
+                used_ids = set(line.strip() for line in f.readlines())
+        
+        # Use a fixed minimum length
+        min_length = 1000
+        filtered_posts = [
+            post for post in all_posts 
+            if post.id not in used_ids 
+            and len(post.selftext) > min_length
+        ]
+        
+        if not filtered_posts:
+            filtered_posts = [post for post in all_posts if len(post.selftext) > min_length]
+        
+        if not filtered_posts:
+            return jsonify({'success': False, 'message': 'No suitable stories found'})
+        
+        # Take a subset of posts for selection
+        selection_posts = filtered_posts[:min(20, len(filtered_posts))]
+        
+        # Create a prompt for story selection
+        post_titles = "\n".join([f"{i+1}. {post.title}" for i, post in enumerate(selection_posts)])
+        
+        selection_prompt = f"""Select ONE story number (1-{len(selection_posts)}) that has the strongest potential for a horror podcast narrative. Consider:
+- Clear narrative structure
+- Strong character development
+- Unique premise
+- Visual storytelling potential
+- Atmospheric content
+
+Available stories:
+{post_titles}
+
+Return only the number."""
+        
+        # Get story selection
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=selection_prompt
+        ).text
+        
+        try:
+            story_index = int(response.strip()) - 1
+            chosen_story = selection_posts[story_index]
+            
+            # Save story ID to avoid reuse
+            with open(cache_file, 'a') as f:
+                f.write(f"{chosen_story.id}\n")
+                
+        except (ValueError, IndexError) as e:
+            chosen_story = random.choice(selection_posts)
+        
+        # Create enhanced podcast-style prompt
+        enhancement_prompt = """Transform this story into a voice over script with the following structure:
+
+1. Start with a powerful hook about the story's theme (2-3 sentences)
+2. Include this intro: "Welcome to The Withering Club, where we explore the darkest corners of human experience. I'm your host, Anna. Before we begin tonight's story, remember that the shadows you see might be watching back. Now, dim the lights and prepare yourself for tonight's tale..."
+3. Tell the story with a clear beginning, middle, and end, focusing on:
+   - Clear narrative flow
+   - Building tension
+   - Natural dialogue
+   - Atmospheric descriptions
+4. End with: "That concludes tonight's tale from The Withering Club. If this story kept you up at night, remember to like, share, and subscribe to join our growing community of darkness seekers. Until next time, remember... the best stories are the ones that follow you home. Sleep well, if you can."
+
+Original Story: {content}
+
+Return ONLY the complete script text with no additional formatting, explanations, or markdown."""
+        
+        # Get enhanced story
+        enhanced_story = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=enhancement_prompt.format(content=chosen_story.selftext)
+        ).text
+        
+        # Clean up the enhanced story
+        enhanced_story = enhanced_story.strip()
+        
+        # Create story data
         story_data = {
-            'title': 'The Shadows That Follow',
-            'original': 'Original story content...',
-            'enhanced': 'Enhanced story with intro and outro...',
-            'subreddit': 'nosleep',
-            'story_id': 'abc123'
+            'title': chosen_story.title,
+            'original': chosen_story.selftext,
+            'enhanced': enhanced_story,
+            'subreddit': chosen_story.subreddit.display_name,
+            'story_id': chosen_story.id
         }
         
         # Store the story data in the project
