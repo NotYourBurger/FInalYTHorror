@@ -1,5 +1,10 @@
 # Continue from previous code...
 
+import os
+
+# Create the directory structure if it doesn't exist
+os.makedirs("web/templates", exist_ok=True)
+
 # HTML template
 with open("web/templates/index.html", "w") as f:
     f.write("""<!DOCTYPE html>
