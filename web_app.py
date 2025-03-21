@@ -1616,24 +1616,28 @@ def main():
             
             # Install flask-ngrok if not already installed
             import subprocess
-            subprocess.run(["pip", "install", "flask-ngrok"], check=True)
+            subprocess.run(["pip", "install", "pyngrok"], check=True)
             
-            # Import and configure ngrok
-            from flask_ngrok import run_with_ngrok
+            # Import and configure ngrok directly
+            from pyngrok import ngrok
             import os
             
             # Set ngrok auth token
             ngrok_auth_token = "2kjfVhuL1QZI4wwCIOOAe6pgunk_7dCPcQqfiBkjLzFduLRQU"
-            os.environ["NGROK_AUTH_TOKEN"] = ngrok_auth_token
+            ngrok.set_auth_token(ngrok_auth_token)
             
-            # Configure Flask to use ngrok
-            run_with_ngrok(app)
+            # Start ngrok tunnel
+            port = 5000
+            public_url = ngrok.connect(port).public_url
             
-            print("\n⚙️ Starting web server with ngrok tunneling...")
-            print("📱 A public URL will be displayed below that you can access from any device")
+            print("\n" + "="*50)
+            print(f"✅ NGROK PUBLIC URL: {public_url}")
+            print(f"📱 You can access this URL from your phone or any device")
+            print("="*50 + "\n")
             
-            # Run Flask app with ngrok
-            app.run()
+            # Run Flask app
+            print("\n⚙️ Starting web server...")
+            app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
             
         else:
             # Not in Colab, try to get local IP for LAN access
