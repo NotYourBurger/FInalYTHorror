@@ -1,15 +1,49 @@
-# Continue from previous code...
-
+# Import necessary modules
 import os
+import sys
+import uuid
+import threading
+import json
+from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask_cors import CORS
+import waitress
 
-# Create the directory structure if it doesn't exist
-os.makedirs("web/templates", exist_ok=True)
-os.makedirs("web/static/js", exist_ok=True)
-os.makedirs("web/static/css", exist_ok=True)
+# Create Flask app
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Dictionary to store active projects
+active_projects = {}
+
+# Dictionary to store background tasks
+background_tasks = {}
+
+# Ensure all required directories exist
+def ensure_directories():
+    """Create all necessary directories for the application."""
+    directories = [
+        "web/templates",
+        "web/static/js",
+        "web/static/css",
+        "output",
+        "output/audio",
+        "output/images",
+        "output/videos",
+        "output/subtitles",
+        "temp"
+    ]
+    
+    for directory in directories:
+        os.makedirs(directory, exist_ok=True)
+        print(f"✓ Directory created/verified: {directory}")
+
+# Call the function to ensure directories exist
+ensure_directories()
 
 # HTML template
-with open("web/templates/index.html", "w") as f:
-    f.write("""<!DOCTYPE html>
+try:
+    with open("web/templates/index.html", "w") as f:
+        f.write("""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -149,10 +183,15 @@ with open("web/templates/index.html", "w") as f:
     <script src="/static/js/app.js"></script>
 </body>
 </html>""")
+    print("✓ Created index.html template")
+except Exception as e:
+    print(f"Error creating index.html: {str(e)}")
+    sys.exit(1)
 
 # Create JavaScript file
-with open("web/static/js/app.js", "w") as f:
-    f.write("""// Global variables
+try:
+    with open("web/static/js/app.js", "w") as f:
+        f.write("""// Global variables
 let projectId = null;
 let selectedStoryIndex = null;
 
@@ -771,26 +810,344 @@ function updateProgress(percent) {
     progressText.textContent = `${percent}%`;
 }
 """)
+    print("✓ Created app.js file")
+except Exception as e:
+    print(f"Error creating app.js: {str(e)}")
+    sys.exit(1)
+
+# Create CSS file
+try:
+    with open("web/static/css/style.css", "w") as f:
+        f.write("""/* Base styles */
+body {
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #666;
+}
+
+/* Status messages */
+#status-container {
+    margin: 20px 0;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f8f8f8;
+}
+
+#status-message {
+    margin: 0;
+    padding: 5px;
+}
+
+#status-message.error {
+    color: #d9534f;
+    background-color: #f2dede;
+    border-left: 4px solid #d9534f;
+    padding-left: 10px;
+}
+
+#status-message.success {
+    color: #5cb85c;
+    background-color: #dff0d8;
+    border-left: 4px solid #5cb85c;
+    padding-left: 10px;
+}
+
+#status-message.info {
+    color: #5bc0de;
+    background-color: #d9edf7;
+    border-left: 4px solid #5bc0de;
+    padding-left: 10px;
+}
+
+/* Progress bar */
+.progress-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+#progress-bar {
+    height: 100%;
+    background-color: #4CAF50;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#progress-text {
+    text-align: center;
+    margin: 0;
+}
+
+/* Workflow steps */
+.workflow {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.step {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* Form elements */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="range"] {
+    width: 100%;
+}
+
+select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Checkbox groups */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.checkbox-item input {
+    margin-right: 5px;
+}
+
+/* Story list and preview */
+#story-list {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+#story-preview {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.story-content {
+    white-space: pre-line;
+    line-height: 1.5;
+}
+
+.story-content.enhanced {
+    border-left: 3px solid #4CAF50;
+    padding-left: 10px;
+}
+
+/* Audio player */
+#audio-player {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Image grid */
+#image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.image-container {
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Export options */
+.export-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.download-link {
+    display: inline-block;
+    background-color: #2196F3;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+.download-link:hover {
+    background-color: #0b7dda;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        width: 95%;
+    }
+    
+    .export-options {
+        flex-direction: column;
+    }
+    
+    #image-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+""")
+    print("✓ Created style.css file")
+except Exception as e:
+    print(f"Error creating style.css: {str(e)}")
+    sys.exit(1)
+
+# Mock services for demonstration
+# In a real application, you would import these from your actual modules
+class MockRedditService:
+    def get_subreddit_list(self):
+        return ["nosleep", "shortscarystories", "creepypasta", "letsnotmeet", "libraryofshadows"]
+    
+    def fetch_stories(self, subreddits, min_length):
+        # Mock implementation
+        return []
+    
+    def mark_story_used(self, story_id):
+        pass
+
+class MockAIService:
+    def enhance_story(self, content):
+        return content
+    
+    def generate_scene_descriptions(self, subtitle_segments):
+        return []
+    
+    def generate_image_prompts(self, scene_descriptions, style):
+        return []
+
+class MockAudioService:
+    def generate_narration(self, text, voice, speed):
+        return "output/audio/narration.mp3"
+    
+    def generate_subtitles(self, audio_path):
+        return "output/subtitles/subtitles.srt"
+    
+    def parse_srt_timestamps(self, srt_path):
+        return []
+
+class MockImageService:
+    def generate_story_images(self, prompts):
+        return ["output/images/image1.jpg", "output/images/image2.jpg"]
+
+class MockVideoService:
+    def create_video(self, prompts, image_paths, audio_path, title, srt_path, video_quality, use_dust_overlay):
+        return "output/videos/video.mp4"
+
+# Initialize mock services
+# In a real application, replace these with your actual service instances
+reddit_service = MockRedditService()
+ai_service = MockAIService()
+audio_service = MockAudioService()
+image_service = MockImageService()
+video_service = MockVideoService()
 
 # API routes
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects', methods=['POST'])
 def create_project():
-    project_id = str(uuid.uuid4())
-    active_projects[project_id] = {
-        'story_data': None,
-        'audio_path': None,
-        'subtitles_path': None,
-        'scene_descriptions': None,
-        'image_prompts': None,
-        'image_paths': None,
-        'video_path': None,
-        'stories': []
-    }
-    return jsonify({'success': True, 'project_id': project_id})
+    try:
+        project_id = str(uuid.uuid4())
+        active_projects[project_id] = {
+            'story_data': None,
+            'audio_path': None,
+            'subtitles_path': None,
+            'scene_descriptions': None,
+            'image_prompts': None,
+            'image_paths': None,
+            'video_path': None,
+            'stories': []
+        }
+        return jsonify({'success': True, 'project_id': project_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/subreddits')
 def get_subreddits():
@@ -1231,11 +1588,21 @@ def video_status():
 # Serve output files
 @app.route('/output/<path:filename>')
 def serve_output(filename):
-    return send_from_directory('output', filename)
+    try:
+        return send_from_directory('output', filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+# Serve static files
+@app.route('/static/<path:path>')
+def serve_static(path):
+    try:
+        return send_from_directory('web/static', path)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 # Main function to run the app
 def main():
-    # Create ngrok tunnel
     try:
         # Try to use ngrok for public URL
         from pyngrok import ngrok
@@ -1252,6 +1619,17 @@ def main():
         # Fall back to regular Flask server
         print(" * ngrok not available, running on local URL only")
         app.run(host='0.0.0.0', port=5000, debug=True)
+    except Exception as e:
+        print(f"Error starting server: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    try:
+        print("Starting Horror Story Generator Web App...")
+        main()
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Unhandled exception: {str(e)}")
+        sys.exit(1) 
