@@ -535,9 +535,8 @@ def run_generation():
             error_message = f"Error importing prototype.py: {str(e)}"
             print(error_message)
             
-            # Check if huggingface_hub is the issue
-            if 'huggingface_hub' in str(e):
-                error_message += "\n\nTry installing the correct version of huggingface_hub: pip install --upgrade huggingface_hub"
+            # Suggest running setup.py
+            error_message += "\n\nTry running setup.py first: python setup.py"
             
             generation_status['status'] = 'error'
             generation_status['message'] = error_message
@@ -613,32 +612,26 @@ def main():
             IN_COLAB = False
             
         if IN_COLAB:
-            print("\n🔄 Setting up Google Colab for external access...")
-            
-            # Install pyngrok if not already installed
-            import subprocess
-            subprocess.run(["pip", "install", "pyngrok"], check=True)
-            
-            # Import and configure ngrok directly
-            from pyngrok import ngrok
-            import os
-            
-            # Set ngrok auth token
-            ngrok_auth_token = "2kjfVhuL1QZI4wwCIOOAe6pgunk_7dCPcQqfiBkjLzFduLRQU"
-            ngrok.set_auth_token(ngrok_auth_token)
-            
-            # Start ngrok tunnel
-            port = 5000
-            public_url = ngrok.connect(port).public_url
-            
-            print("\n" + "="*50)
-            print(f"✅ NGROK PUBLIC URL: {public_url}")
-            print(f"📱 You can access this URL from your phone or any device")
-            print("="*50 + "\n")
-            
-            # Run Flask app
-            print("\n⚙️ Starting web server...")
-            app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+            # Get ngrok configuration from setup
+            try:
+                from pyngrok import ngrok
+                
+                # Start ngrok tunnel
+                port = 5000
+                public_url = ngrok.connect(port).public_url
+                
+                print("\n" + "="*50)
+                print(f"✅ NGROK PUBLIC URL: {public_url}")
+                print(f"📱 You can access this URL from your phone or any device")
+                print("="*50 + "\n")
+                
+                # Run Flask app
+                print("\n⚙️ Starting web server...")
+                app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+            except Exception as e:
+                print(f"Error setting up ngrok: {str(e)}")
+                print("Running with local access only")
+                app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
             
         else:
             # Not in Colab, try to get local IP for LAN access
@@ -658,7 +651,7 @@ def main():
             
     except Exception as e:
         print(f"\n❌ Error starting server: {str(e)}")
-        print("Try installing the required packages: pip install flask flask-cors pyngrok")
+        print("Try running setup.py first: python setup.py")
         sys.exit(1)
 
 if __name__ == "__main__":
